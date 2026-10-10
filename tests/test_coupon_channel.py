@@ -49,6 +49,28 @@ def test_infer_channel_unknown_returns_none():
     assert infer_channel_from_tag(None) is None
 
 
+def test_infer_channel_both_tags_is_unrestricted():
+    """真实 observe（2026-10-10）：9.9元中杯冰美式 标签为「到店专用、外送专用」。
+
+    这是**双渠道通用券**（到店、外送都能用），语义上等同「不限渠道」。
+    旧实现先命中「外送」关键词即返回 delivery，会把这张券误判成外送专用，
+    导致**到店场景被本地过滤掉**——真实深圳案例里正是这张券贡献了 ¥9.10 优惠。
+    """
+    assert infer_channel_from_tag("到店专用、外送专用") is None
+    assert infer_channel_from_tag("外送、到店通用") is None
+    assert infer_channel_from_tag("堂食/麦乐送均可用") is None
+
+
+def test_dual_channel_coupon_kept_in_both_channels():
+    """双标签券在到店与外送两个场景都必须保留（不得被单渠道判定剔除）。"""
+    c = Coupon(
+        "both", kind="fixed", discount=9.0,
+        channel=infer_channel_from_tag("到店专用、外送专用"),
+    )
+    assert [x.id for x in filter_coupons_by_channel([c], CHANNEL_DINE_IN)["valid"]] == ["both"]
+    assert [x.id for x in filter_coupons_by_channel([c], CHANNEL_DELIVERY)["valid"]] == ["both"]
+
+
 # ---------------------------------------------------------------------------
 # 过滤
 # ---------------------------------------------------------------------------
