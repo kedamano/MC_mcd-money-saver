@@ -15,18 +15,25 @@ Author: 麦麦省钱助手参赛项目
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import combinations
 from typing import List, Optional
 
 
 @dataclass
 class Item:
-    """购物项。category 用于类目限定券（如仅限小食/仅限主餐）。"""
+    """购物项。
+
+    category:     类目限定券（如仅限小食/仅限主餐）的匹配依据
+    product_code: 商品编码；产品级绑定券通过该字段精确匹配
+    available:    是否可售（False 表示缺货/停售，优化时应提示并从可优惠范围剔除）
+    """
 
     name: str
     price: float
     category: Optional[str] = None
+    product_code: Optional[str] = None
+    available: bool = True
 
 
 @dataclass
@@ -38,8 +45,10 @@ class Coupon:
         "percent"     折扣券：discount 为折扣率(0.85=85折)，优惠 = eligible小计*(1-rate)，受 max_discount 封顶
         "fixed"       立减券：直接减 discount（需存在 eligible 项）
         "free_delivery" 免配送费：减免全部配送费（同类券自动互斥，仅生效一张）
-    applies_to:  限定类目；None 表示全单通用
-    stack_group: 同组券互斥，仅可叠加一张；None 表示无限制
+    applies_to:   限定类目；None 表示全单通用
+    product_codes: 产品级绑定；非空时**仅**对 product_code 命中的商品生效（见 B 优化项）
+    stack_group:  同组券互斥，仅可叠加一张；None 表示无限制
+    expires_at:   失效日期（YYYY-MM-DD）；非空且早于 now 视为过期（见 E 优化项）
     """
 
     id: str
@@ -48,7 +57,11 @@ class Coupon:
     threshold: float = 0.0
     max_discount: float = 0.0
     applies_to: Optional[str] = None
+    product_codes: List[str] = field(default_factory=list)
     stack_group: Optional[str] = None
+    expires_at: Optional[str] = None
+    coupon_code: Optional[str] = None  # 真实券码（calculate-price 传参用）
+    coupon_id: Optional[str] = None    # 真实券 ID（calculate-price 传参用）
 
 
 def total_price(items: List[Item], delivery_fee: float = 0.0) -> float:
@@ -63,11 +76,24 @@ def _effective_group(coupon: Coupon) -> Optional[str]:
     return coupon.stack_group
 
 
+def _eligible_items(coupon: Coupon, items: List[Item]) -> List[Item]:
+    """计算某张券可作用的商品集合。
+
+    优先级：产品级绑定（product_codes 非空）> 类目限定（applies_to）> 全单通用。
+    不可售商品（available=False）不计入任何券的作用范围（见 E 优化项）。
+    """
+    sellable = [i for i in items if i.available]
+    if coupon.product_codes:
+        pc_set = set(coupon.product_codes)
+        return [i for i in sellable if i.product_code in pc_set]
+    if coupon.applies_to is not None:
+        return [i for i in sellable if i.category == coupon.applies_to]
+    return sellable
+
+
 def _coupon_discount(coupon: Coupon, items: List[Item]) -> float:
     """计算单张券对当前购物项的优惠金额（已通过门槛/类目前置校验）。"""
-    eligible = [
-        i for i in items if coupon.applies_to is None or i.category == coupon.applies_to
-    ]
+    eligible = _eligible_items(coupon, items)
     if coupon.kind == "threshold":
         if sum(e.price for e in eligible) >= coupon.threshold:
             return coupon.discount
@@ -114,14 +140,13 @@ def _is_valid_subset(subset: List[Coupon], items: List[Item], delivery_fee: floa
             order_level_count += 1
             if order_level_count > 1:
                 return False  # 全单通用型订单级券至多一张
-        # 门槛校验
+        # 门槛校验（按产品级/类目作用集合统计）
         if c.kind == "threshold":
-            eligible = [i for i in items if c.applies_to is None or i.category == c.applies_to]
+            eligible = _eligible_items(c, items)
             if sum(e.price for e in eligible) < c.threshold:
                 return False
-        if c.kind == "fixed" and c.applies_to is not None:
-            eligible = [i for i in items if i.category == c.applies_to]
-            if not eligible:
+        if c.kind == "fixed":
+            if not _eligible_items(c, items):
                 return False
     return True
 
@@ -184,6 +209,88 @@ def optimize_coupons(
         "saved": saved,
         "breakdown": breakdown,
     }
+
+
+# ---------------------------------------------------------------------------
+# E. 时效与库存校验
+# ---------------------------------------------------------------------------
+def filter_valid_coupons(
+    coupons: List[Coupon], now: Optional[str] = None
+) -> dict:
+    """按失效日期过滤券。
+
+    now: 当前日期字符串 YYYY-MM-DD（缺省视为不过滤，全部有效）。
+    返回：
+        {
+            "valid":   List[Coupon]  未过期且可参与优化
+            "expired": List[Coupon]  已过期（被剔除）
+            "warnings": List[str]    人类可读提示
+        }
+    """
+    valid: List[Coupon] = []
+    expired: List[Coupon] = []
+    warnings: List[str] = []
+    for c in coupons:
+        if c.expires_at and now and c.expires_at < now:
+            expired.append(c)
+            warnings.append(f"券 {c.id} 已于 {c.expires_at} 过期，已忽略")
+        else:
+            valid.append(c)
+    return {"valid": valid, "expired": expired, "warnings": warnings}
+
+
+def check_item_availability(items: List[Item]) -> List[str]:
+    """返回不可售商品的提示列表（available=False）。"""
+    warnings: List[str] = []
+    for i in items:
+        if not i.available:
+            warnings.append(f"商品「{i.name}」当前不可售，已不计入优惠计算")
+    return warnings
+
+
+# ---------------------------------------------------------------------------
+# D. 两阶段校验 - 本地候选枚举（Top-K）
+# ---------------------------------------------------------------------------
+def rank_candidates(
+    items: List[Item],
+    coupons: List[Coupon],
+    delivery_fee: float = 0.0,
+    top_k: int = 3,
+) -> List[dict]:
+    """本地枚举所有合法券组合，按"本地估计节省"降序返回 Top-K 候选。
+
+    仅供 D 的两阶段校验做初步筛选：先本地剪枝排出 Top-K，
+    再仅对这 K 个候选调用官方 calculate-price 取权威金额，避免 2^n 次网络调用。
+    返回每个候选含 best_coupon_objs（Coupon 对象列表），供核价回调使用。
+    """
+    original_total = total_price(items, delivery_fee)
+    candidates: List[dict] = []
+    n = len(coupons)
+    for r in range(0, n + 1):
+        for subset in combinations(coupons, r):
+            sl = list(subset)
+            if not _is_valid_subset(sl, items, delivery_fee):
+                continue
+            discount = 0.0
+            has_fd = False
+            for c in sl:
+                if c.kind == "free_delivery":
+                    has_fd = True
+                    continue
+                discount += _coupon_discount(c, items)
+            if has_fd:
+                discount += delivery_fee
+            payable = max(0.0, original_total - discount)
+            candidates.append(
+                {
+                    "best_total": round(payable, 2),
+                    "best_coupons": [c.id for c in sl],
+                    "best_coupon_objs": sl,
+                    "saved": round(original_total - payable, 2),
+                }
+            )
+    candidates.sort(key=lambda x: x["saved"], reverse=True)
+    return candidates[:top_k]
 
 
 if __name__ == "__main__":
