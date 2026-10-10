@@ -65,6 +65,17 @@ agent_created: true
 >
 > 上述解析与聚合已实现在 `src/coupon_pools.py`（`collect_coupon_pools`），可直接调用。
 
+> 🧾 **券数核对（用户问"为什么 APP 显示 16 张、你只说 15 张"时用）**：
+> `query-my-coupons` 是「**可用**券」视图（原文自述「共 N 张可用优惠券」），已过期 /
+> 未生效 / 不在每日时段窗内的券会被服务端过滤，所以**它和用户 APP 卡包张数天然不等**，
+> 不是账号不一致。直接用 `coupon_pools.audit_my_coupons(client, now="YYYY-MM-DD HH:MM")`
+> 一次性拿到「服务端声明数 / 本地解析数 / 当时真正可用数 / 过期·未生效·时段外拆分」，
+> 并把 `mismatch=True` 当作**真问题**（解析或分页遗漏）上报。
+
+> ⚠️ **双渠道标签**：券的「标签」可能是「到店专用、外送专用」（如 9.9 元中杯冰美式），
+> 表示**两个渠道都能用 = 不限渠道**，绝不可判成单渠道，否则到店候选会白白丢券
+> （`infer_channel_from_tag` 已按此处理）。
+
 将门店券建模为 `Coupon(id, kind, ...)`：
 - 满减 → `kind="threshold", discount=Y, threshold=X`
 - 折扣 → `kind="percent", discount=0.85`（85 折），可设 `max_discount` 封顶
