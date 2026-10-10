@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# 环境变量 / 密钥（绝不提交真实 Token）
+.env
+.env.*
+*.local
+
+# 编辑器 / 系统
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# WorkBuddy 本地数据
+.workbuddy/
