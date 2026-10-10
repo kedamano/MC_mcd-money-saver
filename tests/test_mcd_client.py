@@ -12,10 +12,16 @@ import json
 import pytest
 
 from src.mcd_client import (
+    MCPCircuitOpen,
+    MCPTransientError,
     McDonaldMCPClient,
     extract_business_data,
     parse_mcp_envelope,
 )
+
+
+def _envelope(text):
+    return json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": text}]}})
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +92,72 @@ def test_build_tools_call_body():
     body = c.build_body("tools/call", {"name": "now-time-info", "arguments": {}}, req_id=2)
     assert body["method"] == "tools/call"
     assert body["params"]["name"] == "now-time-info"
+
+
+# ---------------------------------------------------------------------------
+# 离线：健壮性（重试 / 熔断 / 缓存）
+# ---------------------------------------------------------------------------
+def _no_sleep(monkeypatch):
+    monkeypatch.setattr("time.sleep", lambda *a, **k: None)
+
+
+def test_retry_transient_then_success(monkeypatch):
+    c = McDonaldMCPClient(token="t", retries=2, circuit_threshold=5)
+    state = {"n": 0}
+
+    def flaky(body):
+        state["n"] += 1
+        if state["n"] == 1:
+            raise MCPTransientError("偶发抖动")
+        return _envelope('{"success":true,"data":{"ok":1}}')
+
+    monkeypatch.setattr(c, "_post_once", flaky)
+    _no_sleep(monkeypatch)
+    assert c.call_tool("x", {}) == {"ok": 1}
+    assert state["n"] == 2  # 首次失败后重试成功
+
+
+def test_no_retry_when_disabled(monkeypatch):
+    # 有副作用的调用必须 retry=False：只尝试一次
+    c = McDonaldMCPClient(token="t", retries=5)
+    state = {"n": 0}
+
+    def always_fail(body):
+        state["n"] += 1
+        raise MCPTransientError("fail")
+
+    monkeypatch.setattr(c, "_post_once", always_fail)
+    _no_sleep(monkeypatch)
+    with pytest.raises(MCPTransientError):
+        c.call_tool("create-order", {}, retry=False)
+    assert state["n"] == 1
+
+
+def test_circuit_opens_after_threshold(monkeypatch):
+    c = McDonaldMCPClient(token="t", retries=0, circuit_threshold=2, circuit_cooldown=60)
+    monkeypatch.setattr(c, "_post_once", lambda b: (_ for _ in ()).throw(MCPTransientError("x")))
+    _no_sleep(monkeypatch)
+    with pytest.raises(MCPTransientError):
+        c.call_tool("a", {})  # 失败 1
+    with pytest.raises(MCPTransientError):
+        c.call_tool("a", {})  # 失败 2 -> 熔断打开
+    with pytest.raises(MCPCircuitOpen):
+        c.call_tool("a", {})  # 冷却期内直接拒绝
+
+
+def test_call_tool_cached_hits_cache(monkeypatch):
+    c = McDonaldMCPClient(token="t")
+    state = {"n": 0}
+
+    def once(body):
+        state["n"] += 1
+        return _envelope('{"success":true,"data":{"v":1}}')
+
+    monkeypatch.setattr(c, "_post_once", once)
+    a = c.call_tool_cached("query-meals", {"storeCode": "1"}, ttl=300)
+    b = c.call_tool_cached("query-meals", {"storeCode": "1"}, ttl=300)
+    assert a == b == {"v": 1}
+    assert state["n"] == 1  # 第二次命中缓存，未再请求
 
 
 # ---------------------------------------------------------------------------
