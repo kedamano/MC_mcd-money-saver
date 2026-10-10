@@ -28,13 +28,15 @@ def test_parse_mcp_envelope_json():
 
 
 def test_extract_business_data_from_text_payload():
-    # 真实 observe：tools/call 返回 content[0].text 内含业务 JSON + 说明文字
-    inner = '{"success":true,"data":{"price":1330}}'
-    text = f"以下是计算结果：\n{inner}\n（仅供参考）"
+    # 真实 observe：tools/call 返回 content[0].text 内含业务 JSON + 说明文字，
+    # 业务 JSON 为 {success, code, message, data:{...实际字段...}}，
+    # extract_business_data 应拆到最内层 data（含 price 等真实字段）。
+    payload = '{"success":true,"code":200,"message":"请求成功","data":{"price":1330}}'
+    text = f"以下是计算结果：\n{payload}\n（仅供参考）"
     envelope = {"jsonrpc": "2.0", "result": {"content": [{"type": "text", "text": text}]}}
     data = extract_business_data(envelope)
-    assert data["success"] is True
-    assert data["data"]["price"] == 1330
+    assert data["price"] == 1330  # 已拆到内层 data
+    assert "success" not in data  # 外层标记已被剥离
 
 
 def test_extract_business_data_no_text_raises():
@@ -79,4 +81,4 @@ def test_live_end_to_end():
     tools = client.list_tools()
     assert len(tools) >= 30  # 联调实测 35 个工具
     now = client.call_tool("now-time-info", {})
-    assert "data" in now
+    assert isinstance(now, dict) and now  # 返回已拆到内层的业务 data 字典
