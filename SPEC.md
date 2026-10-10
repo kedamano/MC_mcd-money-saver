@@ -57,6 +57,7 @@
 | 券池单测 | `tests/test_coupon_pools.py` | 三池 Markdown 解析（我的券/麦麦省券）与聚合去重 |
 | 时效单测 | `tests/test_time_window.py` | 生效日期 / 每日时段窗 / 跨零点窗过滤 |
 | 规模单测 | `tests/test_scale_pruning.py` | 大规模券剪枝 + 分支限界：与暴力枚举同解（40 组随机种子）、0 优惠券剪枝安全性、约束一致性、剪枝节点压缩 |
+| Top-K 单测 | `tests/test_topk_pruning.py` | `rank_candidates` 的 Top-K 分支限界：与暴力枚举同值（40 组随机种子 × K∈{1,3,5}）、K 名上界剪枝、大券池可用性 |
 | 合同测试 | `tests/test_real_contract.py` | 基于真实 `calculate-price` 返回，断言客户端模型与服务器一致 |
 | 真实校准 | `tests/test_live_calibration.py`（`-m live`） | 用真实返回值校准本地价格模型与官方一致 |
 | 真实冒烟 | `tests/test_mcd_client.py::test_live_end_to_end`（`-m live`） | 真实连接完成 `initialize→list_tools→call_tool`，默认跳过 |
@@ -64,7 +65,7 @@
 
 运行：
 ```bash
-python -m pytest tests/ -q                 # 离线：58 例全过
+python -m pytest tests/ -q                 # 离线：63 例全过
 MCD_MCP_TOKEN=xxx pytest -m live -q        # 真实端到端（可选，4 例 live）
 python examples/demo_smart.py              # B/C/D/E 离线演示
 MCD_MCP_TOKEN=xxx python examples/demo_live.py           # 真实端到端演示（选店→三池→官方核价）
@@ -86,6 +87,7 @@ MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 真实官方核价�
 | **D2** | 真实核价 demo + 文档 | `examples/demo_live.py` / `DEMO.md` | ✅ |
 | **C1** | 健壮性：瞬时错误(404/5xx/429)指数退避重试 + 熔断（副作用调用禁用重试）；读接口 TTL 缓存；环境自检脚本 | `mcd_client._post`/`call_tool_cached` / `scripts/doctor.py` | ✅ |
 | **C2** | 大规模券剪枝 + 分支限界：券数 >16 自动切 B&B（先剔 0 优惠券，再按乐观上界剪枝），与暴力枚举**同解**；实测 n=20 提速 ~260× | `coupon_optimizer._optimal_subset_bnb` / `_prune_zero_value` / `optimize_coupons(strategy=...)` | ✅ |
+| **C3** | Top-K 候选分支限界：`rank_candidates` 用「大小为 K 的最小堆 + 第 K 名上界剪枝」代替全枚举，与暴力枚举**同值**；实测 n=18 提速 ~180× | `coupon_optimizer._rank_candidates_bnb` / `rank_candidates(strategy=...)` | ✅ |
 
 > **关键 Bug 修复（真机联调发现，均补了回归测试）**：
 > 1. `calculate-price` 返回 `{success,code,message,data:{...}}`，需拆到最内层 `data`，否则取到 `price=None` 核价归零；
