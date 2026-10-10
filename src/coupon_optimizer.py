@@ -133,8 +133,20 @@ def _is_order_level(coupon: Coupon) -> bool:
     return coupon.applies_to is None
 
 
-def _is_valid_subset(subset: List[Coupon], items: List[Item], delivery_fee: float) -> bool:
-    """校验子集是否满足门槛、互斥与订单级券数量约束。"""
+def _is_valid_subset(
+    subset: List[Coupon],
+    items: List[Item],
+    delivery_fee: float,
+    max_coupons: Optional[int] = None,
+) -> bool:
+    """校验子集是否满足门槛、互斥、订单级券数量与「每单券数上限」约束。
+
+    max_coupons: 每单可同时使用的最大券数。真实麦当劳 MCP 实测每单仅支持
+    一张券（calculate-price 传两张券返回 code=600022「暂不支持多张券使用」），
+    故真实核价路径应传 max_coupons=1；缺省 None 表示不限制（保留通用能力）。
+    """
+    if max_coupons is not None and len(subset) > max_coupons:
+        return False
     seen_groups: set = set()
     order_level_count = 0
     for c in subset:
@@ -181,13 +193,20 @@ def _take_discount(coupon: Coupon, items: List[Item], delivery_fee: float) -> fl
 
 
 def _can_take(
-    coupon: Coupon, items: List[Item], used_groups: frozenset, order_level_count: int
+    coupon: Coupon,
+    items: List[Item],
+    used_groups: frozenset,
+    order_level_count: int,
+    taken_count: int = 0,
+    max_coupons: Optional[int] = None,
 ) -> bool:
-    """在已选状态 (used_groups, order_level_count) 上，判断能否再选该券。
+    """在已选状态 (used_groups, order_level_count, taken_count) 上，判断能否再选该券。
 
     与 `_is_valid_subset` 的约束一一对应且**与选择顺序无关**：
-    同组互斥 / 订单级券至多一张 / 满减门槛 / 立减需有适用商品。
+    每单券数上限 / 同组互斥 / 订单级券至多一张 / 满减门槛 / 立减需有适用商品。
     """
+    if max_coupons is not None and taken_count >= max_coupons:
+        return False
     grp = _effective_group(coupon)
     if grp is not None and grp in used_groups:
         return False
@@ -215,7 +234,10 @@ def _prune_zero_value(
 
 
 def _optimal_subset_bnb(
-    items: List[Item], coupons: List[Coupon], delivery_fee: float
+    items: List[Item],
+    coupons: List[Coupon],
+    delivery_fee: float,
+    max_coupons: Optional[int] = None,
 ) -> "tuple[float, List[Coupon], dict]":
     """分支限界求「优惠总额最大（即应付最低）」的券子集。
 
@@ -241,7 +263,7 @@ def _optimal_subset_bnb(
     eps = 1e-9
 
     def dfs(idx: int, discount: float, chosen: List[Coupon],
-            used_groups: frozenset, ol_count: int, fd_used: bool) -> None:
+            used_groups: frozenset, ol_count: int, fd_used: bool, taken: int) -> None:
         nonlocal best_total, best_subset
         stats["nodes"] += 1
         # 乐观下界：剩余券全部入选也追不平当前最优 → 剪枝
@@ -256,9 +278,9 @@ def _optimal_subset_bnb(
             return
         c = coupons[order[idx]]
         # 分支 1：不选该券
-        dfs(idx + 1, discount, chosen, used_groups, ol_count, fd_used)
+        dfs(idx + 1, discount, chosen, used_groups, ol_count, fd_used, taken)
         # 分支 2：选该券（若约束允许）
-        if _can_take(c, items, used_groups, ol_count):
+        if _can_take(c, items, used_groups, ol_count, taken, max_coupons):
             grp = _effective_group(c)
             next_groups = used_groups | {grp} if grp is not None else used_groups
             next_ol = ol_count + (1 if _is_order_level(c) else 0)
@@ -270,10 +292,10 @@ def _optimal_subset_bnb(
                     add = 0.0
                 next_fd = True
             chosen.append(c)
-            dfs(idx + 1, discount + add, chosen, next_groups, next_ol, next_fd)
+            dfs(idx + 1, discount + add, chosen, next_groups, next_ol, next_fd, taken + 1)
             chosen.pop()
 
-    dfs(0, 0.0, [], frozenset(), 0, False)
+    dfs(0, 0.0, [], frozenset(), 0, False, 0)
     return best_total, best_subset, stats
 
 
@@ -284,6 +306,7 @@ def optimize_coupons(
     *,
     strategy: str = "auto",
     brute_force_limit: int = 16,
+    max_coupons_per_order: Optional[int] = None,
 ) -> dict:
     """求最低总价方案（支持暴力枚举 / 分支限界两种策略）。
 
@@ -292,6 +315,10 @@ def optimize_coupons(
         0 优惠券剪枝，再走分支限界（与暴力枚举同解但可扩展到大券池）。
       - "bruteforce"：强制暴力枚举 2^n（作为正确性基准）。
       - "bnb"：强制分支限界。
+
+    max_coupons_per_order: 每单可同时使用的最大券数。真实麦当劳 MCP 实测
+      每单仅支持一张券（传两张返回 code=600022「暂不支持多张券使用」），
+      故真实核价路径应传 1；缺省 None 表示不限制（保留通用组合能力）。
 
     返回结构：
     {
@@ -308,15 +335,21 @@ def optimize_coupons(
 
     if use_bnb:
         pruned = _prune_zero_value(coupons, items, delivery_fee)
-        best_total, best_subset, _stats = _optimal_subset_bnb(items, pruned, delivery_fee)
+        best_total, best_subset, _stats = _optimal_subset_bnb(
+            items, pruned, delivery_fee, max_coupons_per_order
+        )
     else:
         best_total = original_total
         best_subset: List[Coupon] = []
         # 暴力枚举 2^n 个子集（候选券通常为个位数，性能充足）
         for r in range(0, n + 1):
+            if max_coupons_per_order is not None and r > max_coupons_per_order:
+                break
             for subset in combinations(coupons, r):
                 subset_list = list(subset)
-                if not _is_valid_subset(subset_list, items, delivery_fee):
+                if not _is_valid_subset(
+                    subset_list, items, delivery_fee, max_coupons_per_order
+                ):
                     continue
                 discount = 0.0
                 has_free_delivery = False
@@ -466,16 +499,19 @@ def check_item_availability(items: List[Item]) -> List[str]:
 # D. 两阶段校验 - 本地候选枚举（Top-K）
 # ---------------------------------------------------------------------------
 def _rank_candidates_bruteforce(
-    items: List[Item], coupons: List[Coupon], delivery_fee: float, top_k: int
+    items: List[Item], coupons: List[Coupon], delivery_fee: float, top_k: int,
+    max_coupons: Optional[int] = None,
 ) -> List[dict]:
     """暴力枚举全部合法子集，按本地估计节省降序取前 K（正确性基准）。"""
     original_total = total_price(items, delivery_fee)
     candidates: List[dict] = []
     n = len(coupons)
     for r in range(0, n + 1):
+        if max_coupons is not None and r > max_coupons:
+            break
         for subset in combinations(coupons, r):
             sl = list(subset)
-            if not _is_valid_subset(sl, items, delivery_fee):
+            if not _is_valid_subset(sl, items, delivery_fee, max_coupons):
                 continue
             discount = 0.0
             has_fd = False
@@ -500,7 +536,8 @@ def _rank_candidates_bruteforce(
 
 
 def _rank_candidates_bnb(
-    items: List[Item], coupons: List[Coupon], delivery_fee: float, top_k: int
+    items: List[Item], coupons: List[Coupon], delivery_fee: float, top_k: int,
+    max_coupons: Optional[int] = None,
 ) -> List[dict]:
     """Top-K 分支限界：维护大小为 K 的候选**最小堆**，用上界剪掉进不了 Top-K 的分支。
 
@@ -522,7 +559,7 @@ def _rank_candidates_bnb(
     eps = 1e-9
 
     def dfs(idx: int, discount: float, chosen: List[Coupon],
-            used_groups: frozenset, ol_count: int, fd_used: bool) -> None:
+            used_groups: frozenset, ol_count: int, fd_used: bool, taken: int) -> None:
         # 乐观上界：剩余券全选也进不了 Top-K（堆已满且上界 <= 第 K 名）→ 剪枝
         if len(heap) >= top_k and (discount + suffix[idx]) <= heap[0][0] + eps:
             return
@@ -536,9 +573,9 @@ def _rank_candidates_bnb(
             return
         c = coupons[order[idx]]
         # 分支 1：不选
-        dfs(idx + 1, discount, chosen, used_groups, ol_count, fd_used)
+        dfs(idx + 1, discount, chosen, used_groups, ol_count, fd_used, taken)
         # 分支 2：选（若约束允许）
-        if _can_take(c, items, used_groups, ol_count):
+        if _can_take(c, items, used_groups, ol_count, taken, max_coupons):
             grp = _effective_group(c)
             next_groups = used_groups | {grp} if grp is not None else used_groups
             next_ol = ol_count + (1 if _is_order_level(c) else 0)
@@ -549,10 +586,10 @@ def _rank_candidates_bnb(
                     add = 0.0  # 免配送费最多减免一次（与暴力枚举同语义）
                 next_fd = True
             chosen.append(c)
-            dfs(idx + 1, discount + add, chosen, next_groups, next_ol, next_fd)
+            dfs(idx + 1, discount + add, chosen, next_groups, next_ol, next_fd, taken + 1)
             chosen.pop()
 
-    dfs(0, 0.0, [], frozenset(), 0, False)
+    dfs(0, 0.0, [], frozenset(), 0, False, 0)
 
     out: List[dict] = []
     for saved, _, sl in sorted(heap, key=lambda x: x[0], reverse=True):
@@ -576,6 +613,7 @@ def rank_candidates(
     *,
     strategy: str = "auto",
     brute_force_limit: int = 16,
+    max_coupons_per_order: Optional[int] = None,
 ) -> List[dict]:
     """返回本地估计节省额最高的 Top-K 券组合候选。
 
@@ -588,12 +626,15 @@ def rank_candidates(
       - "bruteforce"：强制暴力枚举（正确性基准）。
       - "bnb"：强制 Top-K 分支限界。
 
+    max_coupons_per_order: 每单可同时使用的最大券数（真实 MCP 为 1，见
+      optimize_coupons 说明）；缺省 None 表示不限制。
+
     返回每个候选含 best_coupon_objs（Coupon 对象列表），供核价回调使用。
     """
     use_bnb = strategy == "bnb" or (strategy == "auto" and len(coupons) > brute_force_limit)
     if use_bnb:
-        return _rank_candidates_bnb(items, coupons, delivery_fee, top_k)
-    return _rank_candidates_bruteforce(items, coupons, delivery_fee, top_k)
+        return _rank_candidates_bnb(items, coupons, delivery_fee, top_k, max_coupons_per_order)
+    return _rank_candidates_bruteforce(items, coupons, delivery_fee, top_k, max_coupons_per_order)
 
 
 if __name__ == "__main__":
