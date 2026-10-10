@@ -39,6 +39,29 @@ def test_extract_business_data_from_text_payload():
     assert "success" not in data  # 外层标记已被剥离
 
 
+def test_extract_business_data_list_payload():
+    # 真实 observe：query-nearby-stores / query-store-coupons 的业务 data 是**列表**，
+    # 外层仍是 {success, code, message, ..., data:[...]}。修复前只拆 dict，
+    # 列表会原样返回外层信封 -> 上层拿到非列表、门店数为 0（真机联调踩到的坑）。
+    payload = '{"success":true,"code":200,"message":"请求成功","data":[{"storeCode":"1450104","storeName":"悦荟","distance":194}]}'
+    text = f"门店列表如下：\n{payload}\n（完）"
+    envelope = {"jsonrpc": "2.0", "result": {"content": [{"type": "text", "text": text}]}}
+    data = extract_business_data(envelope)
+    assert isinstance(data, list)  # 已拆到业务层列表
+    assert data[0]["storeCode"] == "1450104"
+
+
+def test_extract_business_data_prefix_with_braces():
+    # 真实 observe：query-meals 的说明文字含 `{code}` 占位符（字段表），
+    # 若按「第一个 {」解析会取到占位符 -> JSONDecodeError（真机联调踩到的坑）。
+    # 修复后按 `{"success"` 精确锚定业务 JSON。
+    payload = '{"success":true,"code":200,"message":"请求成功","data":{"meals":{"1100":{"name":"巨无霸","currentPrice":"25.5"}}}}'
+    text = f"字段说明：data.meals.{{code}}.withOrder.cardId 见下\n{payload}\n（完）"
+    envelope = {"jsonrpc": "2.0", "result": {"content": [{"type": "text", "text": text}]}}
+    data = extract_business_data(envelope)
+    assert data["meals"]["1100"]["name"] == "巨无霸"
+
+
 def test_extract_business_data_no_text_raises():
     with pytest.raises(ValueError):
         extract_business_data({"jsonrpc": "2.0", "result": {}})
