@@ -95,6 +95,78 @@ class McDonaldMCPClient:
         envelope = parse_mcp_envelope(self._post(body))
         return extract_business_data(envelope)
 
+    # ----- 省钱核心：官方核价（D 两阶段校验的真实实现）-----
+    def price_combo(
+        self,
+        store_code: str,
+        items: List[Dict[str, Any]],
+        coupons: Optional[List[Dict[str, Any]]] = None,
+        order_type: int = 1,
+        be_type: int = 1,
+        need_tableware: bool = False,
+    ) -> Dict[str, Any]:
+        """调用 calculate-price 获取官方权威金额（单位：分）。
+
+        参数：
+            items:   [{"product_code": "520689", "quantity": 1}, ...]
+            coupons: [{"coupon_code": "MCD...", "coupon_id": "365A..."}, ...]（可选）
+        返回业务 data：含 originalPrice / discount / price / packingPrice 等（分）。
+        """
+        priced_items = []
+        for it in items:
+            entry: Dict[str, Any] = {
+                "productCode": it["product_code"],
+                "quantity": it.get("quantity", 1),
+            }
+            priced_items.append(entry)
+        # 把券按 item 维度挂接（麦当劳 calculate-price 在 items[].couponCode/couponId 传券）
+        if coupons:
+            # 简单策略：所有券挂到第一个商品上由官方判定能否叠加
+            first = priced_items[0]
+            for c in coupons:
+                first.setdefault("couponCode", c["coupon_code"])
+                first.setdefault("couponId", c["coupon_id"])
+        arguments = {
+            "storeCode": store_code,
+            "orderType": order_type,
+            "beType": be_type,
+            "needTableware": need_tableware,
+            "items": priced_items,
+        }
+        return self.call_tool("calculate-price", arguments)
+
+    @staticmethod
+    def price_combo_as_fn(store_code: str, order_type: int = 1, be_type: int = 1):
+        """生成一个可直接作为 two_stage_optimize(pricing_fn=...) 的回调。
+
+        回调签名 (subset_coupons: List[Coupon], items: List[Item]) -> float（元）。
+        内部用环境变量 MCD_MCP_TOKEN 初始化客户端，对 Top-K 候选逐一核价。
+        """
+        import os
+        from src.coupon_optimizer import Coupon, Item
+
+        token = os.environ.get("MCD_MCP_TOKEN", "")
+        client = McDonaldMCPClient(token=token)
+
+        def _fn(subset_coupons: List[Coupon], items: List[Item]) -> float:
+            product_items = [
+                {"product_code": i.product_code or "", "quantity": 1}
+                for i in items
+                if i.product_code
+            ]
+            coupon_args = [
+                {
+                    "coupon_code": c.coupon_code or c.id,
+                    "coupon_id": c.coupon_id or c.id,
+                }
+                for c in subset_coupons
+            ]
+            data = client.price_combo(store_code, product_items, coupon_args, order_type, be_type)
+            price_fen = data.get("price") or data.get("originalPrice") or 0
+            return round(price_fen / 100.0, 2)
+
+        return _fn
+
 
 # ---------------------------------------------------------------------------
 # 协议解析（纯函数，可单测）
@@ -137,4 +209,8 @@ def extract_business_data(envelope: Dict[str, Any]) -> Dict[str, Any]:
     if idx < 0:
         raise ValueError("text 中未找到业务 JSON")
     data, _ = decoder.raw_decode(text, idx)
+    # 真实 observe：外层为 {success, code, message, data:{...实际业务...}}
+    # 若解析结果内嵌 data 字典，则进一步拆到业务层
+    if isinstance(data.get("data"), dict):
+        return data["data"]
     return data
