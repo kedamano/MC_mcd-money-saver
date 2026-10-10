@@ -26,6 +26,11 @@
 
 <p align="center">  
   <a href="https://mcd-money-saver.app.workbuddy.host/"><b>👉 在线体验：勾几样菜，立刻算出今日最省点法</b></a>  
+  <br><sub>体验页已接入 <b>WorkBuddy 云服务</b>：方案可存进云端「省钱墙」，AI 免密钥大模型帮你配单</sub>  
+</p>
+
+<p align="center">  
+  <img src="docs/assets/demo-cloud-live.png" alt="在线体验页：云端省钱墙 + AI 配单" width="860">  
 </p>
 
 ---
