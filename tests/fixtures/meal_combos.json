@@ -1,0 +1,384 @@
+[
+  {
+    "code": "9900016075",
+    "name": "龙焰芝士棒鸡腿堡三件套",
+    "combo_price": 29.9,
+    "individual_sum": 40.5,
+    "components": [
+      {
+        "code": "521953",
+        "name": "龙焰芝士棒鸡腿堡",
+        "qty": 1,
+        "unit_price": 27.0
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900016073",
+    "name": "龙焰鸡腿堡三件套",
+    "combo_price": 26.9,
+    "individual_sum": 37.5,
+    "components": [
+      {
+        "code": "521952",
+        "name": "龙焰鸡腿堡",
+        "qty": 1,
+        "unit_price": 24.0
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900000890",
+    "name": "板烧鸡腿堡四件套",
+    "combo_price": 28.0,
+    "individual_sum": 37.0,
+    "components": [
+      {
+        "code": "1406",
+        "name": "板烧鸡腿堡",
+        "qty": 1,
+        "unit_price": 23.5
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900016309",
+    "name": "龙焰鸡腿堡四件套",
+    "combo_price": 29.0,
+    "individual_sum": 37.5,
+    "components": [
+      {
+        "code": "521952",
+        "name": "龙焰鸡腿堡",
+        "qty": 1,
+        "unit_price": 24.0
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900016310",
+    "name": "龙焰芝士棒鸡腿堡四件套",
+    "combo_price": 32.0,
+    "individual_sum": 40.5,
+    "components": [
+      {
+        "code": "521953",
+        "name": "龙焰芝士棒鸡腿堡",
+        "qty": 1,
+        "unit_price": 27.0
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900004236",
+    "name": "人气超值四件套随心选",
+    "combo_price": 28.0,
+    "individual_sum": 36.0,
+    "components": [
+      {
+        "code": "1440",
+        "name": "麦辣鸡腿汉堡",
+        "qty": 1,
+        "unit_price": 22.5
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900006957",
+    "name": "安格斯厚牛堡四件套随心选",
+    "combo_price": 37.0,
+    "individual_sum": 45.0,
+    "components": [
+      {
+        "code": "511782",
+        "name": "芝士安格斯厚牛堡",
+        "qty": 1,
+        "unit_price": 31.5
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900010110",
+    "name": "鱼牛汉堡四件套随心选",
+    "combo_price": 32.0,
+    "individual_sum": 39.0,
+    "components": [
+      {
+        "code": "1100",
+        "name": "巨无霸",
+        "qty": 1,
+        "unit_price": 25.5
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900005456",
+    "name": "麦辣鸡腿汉堡三件套",
+    "combo_price": 33.5,
+    "individual_sum": 36.0,
+    "components": [
+      {
+        "code": "1440",
+        "name": "麦辣鸡腿汉堡",
+        "qty": 1,
+        "unit_price": 22.5
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900005460",
+    "name": "麦香鱼套餐",
+    "combo_price": 33.5,
+    "individual_sum": 36.0,
+    "components": [
+      {
+        "code": "1600",
+        "name": "麦香鱼",
+        "qty": 1,
+        "unit_price": 22.5
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900005462",
+    "name": "板烧鸡腿堡三件套",
+    "combo_price": 34.5,
+    "individual_sum": 37.0,
+    "components": [
+      {
+        "code": "1406",
+        "name": "板烧鸡腿堡",
+        "qty": 1,
+        "unit_price": 23.5
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900005464",
+    "name": "双层吉士汉堡套餐",
+    "combo_price": 34.0,
+    "individual_sum": 36.5,
+    "components": [
+      {
+        "code": "1120",
+        "name": "双层吉士汉堡",
+        "qty": 1,
+        "unit_price": 23.0
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900005466",
+    "name": "巨无霸三件套",
+    "combo_price": 36.5,
+    "individual_sum": 39.0,
+    "components": [
+      {
+        "code": "1100",
+        "name": "巨无霸",
+        "qty": 1,
+        "unit_price": 25.5
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900015008",
+    "name": "酥酥多笋卷三件套",
+    "combo_price": 31.5,
+    "individual_sum": 34.0,
+    "components": [
+      {
+        "code": "521816",
+        "name": "酥酥多笋卷",
+        "qty": 1,
+        "unit_price": 20.5
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900005453",
+    "name": "麦香鸡套餐",
+    "combo_price": 28.0,
+    "individual_sum": 30.5,
+    "components": [
+      {
+        "code": "1450",
+        "name": "麦香鸡",
+        "qty": 1,
+        "unit_price": 17.0
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900005468",
+    "name": "培根蔬萃双层牛堡三件套",
+    "combo_price": 35.5,
+    "individual_sum": 38.0,
+    "components": [
+      {
+        "code": "1106",
+        "name": "培根蔬萃双层牛堡",
+        "qty": 1,
+        "unit_price": 24.5
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900004835",
+    "name": "麦乐鸡套餐",
+    "combo_price": 25.0,
+    "individual_sum": 27.5,
+    "components": [
+      {
+        "code": "1401",
+        "name": "麦乐鸡5块",
+        "qty": 1,
+        "unit_price": 14.0
+      },
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900005449",
+    "name": "吉士汉堡包套餐",
+    "combo_price": 26.0,
+    "individual_sum": 13.5,
+    "components": [
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900005413",
+    "name": "双层深海鳕鱼堡三件套",
+    "combo_price": 35.0,
+    "individual_sum": 13.5,
+    "components": [
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  },
+  {
+    "code": "9900005451",
+    "name": "麦辣鸡翅4块套餐",
+    "combo_price": 36.5,
+    "individual_sum": 13.5,
+    "components": [
+      {
+        "code": "4810",
+        "name": "中薯条",
+        "qty": 1,
+        "unit_price": 13.5
+      }
+    ]
+  }
+]
