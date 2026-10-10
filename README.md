@@ -21,6 +21,8 @@
 6. **确认下单**（`create-order` 获取支付链接）
 
 核心省钱逻辑由纯函数模块 `src/coupon_optimizer.py` 实现，已被 10 个单元测试覆盖（TDD）。
+项目遵循 **SDD（规格驱动）+ TDD（测试驱动）+ 真实业务场景** 三重方法：
+规格见 `SPEC.md`，真实 `calculate-price` 返回已固化为 `tests/fixtures/*.json` 作为合同测试黄金基准。
 
 ## 目标用户
 
@@ -80,11 +82,12 @@
 
 ## 本地验证（无需 Token）
 
-核心算法可独立测试，不依赖麦当劳 MCP：
+核心算法与真实接口解析均可离线测试，不依赖麦当劳 MCP：
 
 ```bash
-python -m pytest tests/ -q
-python src/coupon_optimizer.py   # 内置演示
+python -m pytest tests/ -q                 # 离线：19 例全过（含真实合同测试）
+python src/coupon_optimizer.py             # 内置演示
+MCD_MCP_TOKEN=xxx pytest -m live -q        # 可选：真实端到端冒烟（initialize→list_tools→call_tool）
 ```
 
 ## 仓库结构
@@ -93,16 +96,22 @@ python src/coupon_optimizer.py   # 内置演示
 mcd-money-saver/
 ├── SKILL.md                    # WorkBuddy Skill 定义（省钱工作流）
 ├── README.md                   # 本文件
+├── SPEC.md                     # 规格说明书（SDD，含真实业务规则与验收标准）
 ├── CONTEST_DECLARATION.md      # 参赛声明（官方原文，不可改）
 ├── MCP_INTEGRATION.md          # 麦当劳 MCP 集成说明
 ├── mcp-config.example.json     # 脱敏 MCP 配置示例（仅环境变量占位符）
 ├── workbuddy.md                # WorkBuddy 联动开发上下文（专项奖励核验）
 ├── src/
 │   ├── __init__.py
-│   └── coupon_optimizer.py     # 优惠券最优组合优化器（核心源码）
+│   ├── coupon_optimizer.py     # 优惠券最优组合优化器（核心源码）
+│   ├── coupon_adapter.py       # 真实券 JSON -> 领域 Coupon（类型/面额推断）
+│   └── mcd_client.py           # 麦当劳 MCP 真实客户端（Streamable HTTP，可运行）
 ├── tests/
-│   └── test_coupon_optimizer.py# TDD 测试契约（10 例全过）
-├── conftest.py                 # pytest 路径配置
+│   ├── test_coupon_optimizer.py# TDD 测试契约（10 例全过）
+│   ├── test_real_contract.py   # 真实合同测试（基于 fixtures 黄金基准）
+│   ├── test_mcd_client.py      # 客户端解析单测 + 可选真实冒烟(-m live)
+│   └── fixtures/               # 真实 calculate-price 返回（脱敏，固化基准）
+├── conftest.py / pytest.ini    # pytest 路径与标记配置
 └── references/
     └── mcp_tools.md            # 省钱场景 MCP 工具参考
 ```
