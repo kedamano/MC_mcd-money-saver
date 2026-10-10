@@ -82,6 +82,7 @@
 6. **券商品需带券**：以 `990000` 开头的券商品（如 9900000119 美式中杯）基础算价返回空，必须配合对应券；常规售卖商品（如 520689 鲜萃咖啡）可直接基础算价。
 7. **外送全程必传 `beCode`**：外送(beType=2)下 `query-meals` / `query-store-coupons` / `calculate-price` 缺 `beCode` 报 `code=600048`；`beCode` 来自 `delivery-query-stores`（须先 `delivery-create-address` 建地址）。外送商品 `code` 与到店不通用（到店下单报 `60006 不可售`）。
 8. **券有渠道限制**：到店专用券用于外送核价返回 `code=600012「当前优惠券不可用！」`，到店则正常生效。外送价额外含 `deliveryPrice`（配送费）与 `packingPrice`（打包服务费），且折扣可能来自商品自身促销价而非券。
+9. **失败响应不含 `price` 字段**：券被拒时返回 `{"success":false,"code":600012,"message":...}`，**无 `price` / `data`**。若沿用 `data.get("price") or 0` 取值会得到 **¥0**，使「被官方拒绝的方案反而最便宜」。客户端已在 `price_combo` 内调用 `errors.raise_if_business_error` 拦截并抛 `CouponRejectedError`；优化器据此将候选**剔除**（而非降级）。真机验证：无效券码现返回 `CouponRejectedError 600012`。
 
 ### 6.3 实测核价样例
 
