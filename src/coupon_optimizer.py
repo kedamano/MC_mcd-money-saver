@@ -18,7 +18,8 @@ Author: 麦麦省钱助手参赛项目
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from itertools import combinations
+from itertools import combinations, count
+import heapq
 from typing import List, Optional, Tuple
 
 
@@ -464,18 +465,10 @@ def check_item_availability(items: List[Item]) -> List[str]:
 # ---------------------------------------------------------------------------
 # D. 两阶段校验 - 本地候选枚举（Top-K）
 # ---------------------------------------------------------------------------
-def rank_candidates(
-    items: List[Item],
-    coupons: List[Coupon],
-    delivery_fee: float = 0.0,
-    top_k: int = 3,
+def _rank_candidates_bruteforce(
+    items: List[Item], coupons: List[Coupon], delivery_fee: float, top_k: int
 ) -> List[dict]:
-    """本地枚举所有合法券组合，按"本地估计节省"降序返回 Top-K 候选。
-
-    仅供 D 的两阶段校验做初步筛选：先本地剪枝排出 Top-K，
-    再仅对这 K 个候选调用官方 calculate-price 取权威金额，避免 2^n 次网络调用。
-    返回每个候选含 best_coupon_objs（Coupon 对象列表），供核价回调使用。
-    """
+    """暴力枚举全部合法子集，按本地估计节省降序取前 K（正确性基准）。"""
     original_total = total_price(items, delivery_fee)
     candidates: List[dict] = []
     n = len(coupons)
@@ -504,6 +497,103 @@ def rank_candidates(
             )
     candidates.sort(key=lambda x: x["saved"], reverse=True)
     return candidates[:top_k]
+
+
+def _rank_candidates_bnb(
+    items: List[Item], coupons: List[Coupon], delivery_fee: float, top_k: int
+) -> List[dict]:
+    """Top-K 分支限界：维护大小为 K 的候选**最小堆**，用上界剪掉进不了 Top-K 的分支。
+
+    与 `_optimal_subset_bnb` 同一套上界；区别在于剪枝阈值是「当前第 K 名节省额」
+    而非「当前最优」，因此这里求的是节省额最高的 K 个组合。
+    先剔除 0 优惠券（不影响任何候选的节省额，只去冗余）。
+    """
+    original = total_price(items, delivery_fee)
+    coupons = _prune_zero_value(coupons, items, delivery_fee)
+    n = len(coupons)
+    ideals = [_coupon_ideal_discount(c, items, delivery_fee) for c in coupons]
+    order = sorted(range(n), key=lambda i: ideals[i], reverse=True)
+    suffix = [0.0] * (n + 1)
+    for k in range(n - 1, -1, -1):
+        suffix[k] = suffix[k + 1] + ideals[order[k]]
+
+    heap: List[Tuple[float, int, List[Coupon]]] = []  # (saved, seq, subset) 最小堆
+    seq = count()
+    eps = 1e-9
+
+    def dfs(idx: int, discount: float, chosen: List[Coupon],
+            used_groups: frozenset, ol_count: int, fd_used: bool) -> None:
+        # 乐观上界：剩余券全选也进不了 Top-K（堆已满且上界 <= 第 K 名）→ 剪枝
+        if len(heap) >= top_k and (discount + suffix[idx]) <= heap[0][0] + eps:
+            return
+        if idx == n:
+            saved = min(original, discount)
+            item = (saved, next(seq), list(chosen))
+            if len(heap) < top_k:
+                heapq.heappush(heap, item)
+            elif saved > heap[0][0] + eps:
+                heapq.heapreplace(heap, item)
+            return
+        c = coupons[order[idx]]
+        # 分支 1：不选
+        dfs(idx + 1, discount, chosen, used_groups, ol_count, fd_used)
+        # 分支 2：选（若约束允许）
+        if _can_take(c, items, used_groups, ol_count):
+            grp = _effective_group(c)
+            next_groups = used_groups | {grp} if grp is not None else used_groups
+            next_ol = ol_count + (1 if _is_order_level(c) else 0)
+            add = _take_discount(c, items, delivery_fee)
+            next_fd = fd_used
+            if c.kind == "free_delivery":
+                if fd_used:
+                    add = 0.0  # 免配送费最多减免一次（与暴力枚举同语义）
+                next_fd = True
+            chosen.append(c)
+            dfs(idx + 1, discount + add, chosen, next_groups, next_ol, next_fd)
+            chosen.pop()
+
+    dfs(0, 0.0, [], frozenset(), 0, False)
+
+    out: List[dict] = []
+    for saved, _, sl in sorted(heap, key=lambda x: x[0], reverse=True):
+        payable = max(0.0, original - saved)
+        out.append(
+            {
+                "best_total": round(payable, 2),
+                "best_coupons": [c.id for c in sl],
+                "best_coupon_objs": sl,
+                "saved": round(saved, 2),
+            }
+        )
+    return out
+
+
+def rank_candidates(
+    items: List[Item],
+    coupons: List[Coupon],
+    delivery_fee: float = 0.0,
+    top_k: int = 3,
+    *,
+    strategy: str = "auto",
+    brute_force_limit: int = 16,
+) -> List[dict]:
+    """返回本地估计节省额最高的 Top-K 券组合候选。
+
+    仅供 D 的两阶段校验做初步筛选：先本地排出 Top-K，
+    再仅对这 K 个候选调用官方 calculate-price 取权威金额，避免 2^n 次网络调用。
+
+    strategy:
+      - "auto"（默认）：券数 <= `brute_force_limit` 走暴力枚举；超过则走
+        Top-K 分支限界（与暴力枚举同值）。
+      - "bruteforce"：强制暴力枚举（正确性基准）。
+      - "bnb"：强制 Top-K 分支限界。
+
+    返回每个候选含 best_coupon_objs（Coupon 对象列表），供核价回调使用。
+    """
+    use_bnb = strategy == "bnb" or (strategy == "auto" and len(coupons) > brute_force_limit)
+    if use_bnb:
+        return _rank_candidates_bnb(items, coupons, delivery_fee, top_k)
+    return _rank_candidates_bruteforce(items, coupons, delivery_fee, top_k)
 
 
 if __name__ == "__main__":
