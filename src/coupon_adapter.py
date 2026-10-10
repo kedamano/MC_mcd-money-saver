@@ -68,10 +68,14 @@ def adapt_coupon(raw: Dict[str, Any], *, order_type: int = 1) -> Coupon:
     kind, discount, threshold, max_discount = _infer_kind_and_amount(desc)
 
     coupon_id = raw.get("couponId") or raw.get("couponCode") or desc
+    coupon_code = raw.get("couponCode")
     product_codes: List[str] = []
     pc = raw.get("productCode")
     if pc:
         product_codes = [pc] if isinstance(pc, str) else list(pc)
+
+    # 失效日期（真实券 JSON 可能含 validEnd / expireTime 等字段）
+    expires_at = raw.get("validEnd") or raw.get("expireTime") or raw.get("endDate")
 
     coupon = Coupon(
         id=str(coupon_id),
@@ -80,7 +84,9 @@ def adapt_coupon(raw: Dict[str, Any], *, order_type: int = 1) -> Coupon:
         threshold=threshold,
         max_discount=max_discount,
         applies_to=None,  # 产品级绑定优先于泛类目，统一在校验阶段按 product_codes 处理
+        product_codes=product_codes,
+        expires_at=str(expires_at) if expires_at else None,
+        coupon_code=str(coupon_code) if coupon_code else None,
+        coupon_id=str(coupon_id) if coupon_id else None,
     )
-    # 附加产品绑定（非 dataclass 字段，供校验层消费）
-    coupon.product_codes = product_codes  # type: ignore[attr-defined]
     return coupon
