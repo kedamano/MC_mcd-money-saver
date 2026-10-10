@@ -27,7 +27,11 @@ agent_created: true
 
 ### 1. 选门店
 - 到店：调用 `query-nearby-stores` 拿到附近门店，请用户确认目标门店。
-- 外送：调用 `delivery-query-stores`（必要时先 `delivery-query-addresses` / `delivery-create-address`）。
+- 外送：先 `delivery-query-addresses` 取配送地址（为空则 `delivery-create-address` 创建），
+  再用 `delivery-query-stores`（`beType=2`）查可配送门店，**记下门店的 `beCode`**。
+  > ⚠️ **外送全程必传 `beCode`**：`query-meals` / `query-store-coupons` / `calculate-price`
+  > 在外送场景缺 `beCode` 一律报 `code=600048「外送场景下，beType=2/5/6时必传beCode」`；
+  > `beCode` 只来自外送门店。外送商品 `code` 与到店**不通用**。
 
 ### 2. 选品，构造购物项
 - 调用 `query-meals` 拉取该门店菜单；按用户需求确定商品。
@@ -59,6 +63,10 @@ agent_created: true
 - 免配送费 → `kind="free_delivery"`
 
 > 券面字段（门槛、折扣率、适用类目、有效期）以 MCP 实际返回为准；用 `now-time-info` 校验时效。
+>
+> ⚠️ **券有渠道限制**：标注「到店专用」的券**不能用于外送**——外送核价会返回
+> `code=600012「当前优惠券不可用！」`（同一张券到店则正常生效）。选券时必须按当前
+> `orderType` 过滤，避免报出"算得省、下单废"的假方案。
 
 ### 4. 跑优化器，挑最优组合
 > ⏱️ **先按时间有效性过滤**：用 `now-time-info` 拿到当前时间，调用
@@ -85,6 +93,11 @@ coupons = [Coupon("c1", "threshold", discount=12.0, threshold=30.0),
 print(optimize_coupons(items, coupons, delivery_fee=6.0))
 ```
 
+> 🔀 **多张券时考虑拆分下单**：真实规则「每单仅一张券」——当手里有多张作用于**不同商品**的券时，
+> 调 `optimize_split_orders(items, coupons, delivery_fee, max_orders=3)` 求「拆成多单、每单配一张券」
+> 的**全局最低价**；外送时每单都要付配送费，算法会自动判断拆分是否真的划算。
+> 返回 `orders[]` 给出每单的商品与用券明细。
+
 ### 5. 用官方接口核价（关键）
 用优化器给出的 `best_coupons` 调用 `calculate-price`，传入商品列表与对应券，
 将返回金额与优化器 `best_total` 对照。**以 `calculate-price` 官方结果为准**；
@@ -96,7 +109,7 @@ print(optimize_coupons(items, coupons, delivery_fee=6.0))
 1. **先取取餐方式**：到店场景 `calculate-price` 返回 `takeWayList`
    （如 `[{"code":"eat-in","title":"堂食"},{"code":"take-in-store","title":"外带"}]`），
    选一个 `code` 作为 `takeWayCode`（用 `McDonaldMCPClient.pick_take_way` 获取）；
-2. 调用 `create-order`（到店 `orderType=1` 必传 `takeWayCode`；外送 `orderType=2` 传 `addressId`），
+2. 调用 `create-order`（到店 `orderType=1` 必传 `takeWayCode`；外送 `orderType=2` 传 `addressId` + `beCode`），
    接口实现见 `src/mcd_client.py` 的 `create_order`；
 3. 返回支付链接后引导用户支付，再用 `query-order` 核对订单状态。
 
