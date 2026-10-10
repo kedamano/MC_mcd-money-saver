@@ -89,6 +89,24 @@ def test_build_tools_call_body():
 
 
 # ---------------------------------------------------------------------------
+# 离线：下单链路（takeWayCode 依赖）
+# ---------------------------------------------------------------------------
+def test_pick_take_way():
+    # 真实 observe：calculate-price 返回 takeWayList，到店下单需从中选 takeWayCode
+    data = {"takeWayList": [{"code": "eat-in"}, {"code": "take-in-store"}]}
+    assert McDonaldMCPClient.pick_take_way(data) == "take-in-store"  # 默认偏好外带
+    assert McDonaldMCPClient.pick_take_way(data, prefer="eat-in") == "eat-in"
+    assert McDonaldMCPClient.pick_take_way({}) is None
+
+
+def test_create_order_requires_take_way_code():
+    # 到店(orderType=1)缺 takeWayCode 必须在触网前就报错，避免产生无效下单请求
+    c = McDonaldMCPClient(token="dummy")
+    with pytest.raises(ValueError):
+        c.create_order("1450104", [{"product_code": "1100", "quantity": 1}], order_type=1)
+
+
+# ---------------------------------------------------------------------------
 # 真实冒烟（默认跳过）
 # ---------------------------------------------------------------------------
 @pytest.mark.live
@@ -105,3 +123,29 @@ def test_live_end_to_end():
     assert len(tools) >= 30  # 联调实测 35 个工具
     now = client.call_tool("now-time-info", {})
     assert isinstance(now, dict) and now  # 返回已拆到内层的业务 data 字典
+
+
+@pytest.mark.live
+def test_create_order_live_guarded():
+    """真实下单链路（默认跳过，需显式开启，避免误产生真实待支付订单）。
+
+    开启方式：
+        MCD_MCP_TOKEN=xxx MCD_ALLOW_REAL_ORDER=1 pytest -m live -k create_order
+    ⚠️ 会真实创建麦当劳订单并返回支付链接，请自行承担下单后果。
+    """
+    import os
+
+    token = os.environ.get("MCD_MCP_TOKEN")
+    if not token:
+        pytest.skip("需要 MCD_MCP_TOKEN 环境变量")
+    if os.environ.get("MCD_ALLOW_REAL_ORDER") != "1":
+        pytest.skip("真实下单需显式设置 MCD_ALLOW_REAL_ORDER=1")
+
+    client = McDonaldMCPClient(token=token)
+    store_code = "1450104"
+    items = [{"product_code": "1100", "quantity": 1}]
+    price = client.price_combo(store_code, items)
+    take_way = McDonaldMCPClient.pick_take_way(price)
+    assert take_way, "calculate-price 应返回 takeWayList"
+    order = client.create_order(store_code, items, take_way_code=take_way)
+    assert isinstance(order, dict) and order  # 返回订单号 / 支付链接等
