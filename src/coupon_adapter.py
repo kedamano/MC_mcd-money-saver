@@ -18,6 +18,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from src.coupon_optimizer import Coupon
+from src.coupon_pools import parse_valid_period
 
 # 保留比例（0.7 = 7折，即顾客支付 70%）
 _RE_THRESHOLD = re.compile(r"满\s*(\d+(?:\.\d+)?)\s*减\s*(\d+(?:\.\d+)?)")
@@ -76,6 +77,15 @@ def adapt_coupon(raw: Dict[str, Any], *, order_type: int = 1) -> Coupon:
 
     # 失效日期（真实券 JSON 可能含 validEnd / expireTime 等字段）
     expires_at = raw.get("validEnd") or raw.get("expireTime") or raw.get("endDate")
+    valid_from = raw.get("validStart") or raw.get("startDate")
+    time_windows: List = []
+    # 门店券真实字段 tradeDateTime 形如 "2026-10-10 00:00:00-2026-11-08 23:59:59"
+    td = raw.get("tradeDateTime")
+    if td:
+        vf, ex, wins = parse_valid_period(str(td))
+        valid_from = valid_from or vf
+        expires_at = expires_at or ex
+        time_windows = wins
 
     coupon = Coupon(
         id=str(coupon_id),
@@ -86,6 +96,8 @@ def adapt_coupon(raw: Dict[str, Any], *, order_type: int = 1) -> Coupon:
         applies_to=None,  # 产品级绑定优先于泛类目，统一在校验阶段按 product_codes 处理
         product_codes=product_codes,
         expires_at=str(expires_at) if expires_at else None,
+        valid_from=str(valid_from) if valid_from else None,
+        time_windows=time_windows,
         coupon_code=str(coupon_code) if coupon_code else None,
         coupon_id=str(coupon_id) if coupon_id else None,
     )
