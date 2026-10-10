@@ -18,6 +18,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.mcd_client import McDonaldMCPClient
+from src.coupon_pools import collect_coupon_pools
 
 LINE = "=" * 60
 SUB = "-" * 60
@@ -78,15 +79,22 @@ def main() -> int:
             m = meals[code]
             print(f"                    - {m.get('name')} {_fen(float(m.get('currentPrice', 0)) * 100)}")
 
-    # [4/5] 门店券
-    coupons = client.call_tool(
-        "query-store-coupons", {"storeCode": store_code, "orderType": 1, "beType": 1}
-    )
-    coupons = coupons if isinstance(coupons, list) else []
-    print(f"[4/5] 门店优惠券   {len(coupons)} 张")
-    for c in coupons:
+    # [4/5] 三池券聚合（门店券 / 我的券 / 麦麦省券）
+    pools = collect_coupon_pools(client, store_code)
+    store, mine, claimable = pools["store"], pools["mine"], pools["claimable"]
+    print(f"[4/5] 三池券聚合   门店券 {len(store)} · 我的券 {len(mine)} · 可领麦麦省券 {len(claimable)}")
+    for c in store:
         prods = "、".join(p.get("productName", "") for p in c.get("products", []))
-        print(f"                    - {c.get('title')}（适用：{prods}）")
+        print(f"      [门店券·可核价] {c.get('title')}（适用：{prods}）")
+    for c in mine:
+        print(f"      [我的券·展示]  {c.get('name')}  {c.get('price_text')}  {c.get('tag') or ''}")
+    for c in claimable:
+        print(f"      [麦麦省·可领取] {c.get('title')}（{c.get('status')}）")
+    if pools["overlap"]:
+        print(f"      重叠（门店券∩我的券）：{'、'.join(pools['overlap'])}")
+    for w in pools["warnings"]:
+        print(f"      ⚠️ {w}")
+    coupons = store
 
     if not coupons:
         print(SUB)
