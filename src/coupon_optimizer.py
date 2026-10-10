@@ -637,6 +637,178 @@ def rank_candidates(
     return _rank_candidates_bruteforce(items, coupons, delivery_fee, top_k, max_coupons_per_order)
 
 
+# ---------------------------------------------------------------------------
+# B1. 拆分下单（多单拆分）：每单至多一张券约束下的全局最低价
+# ---------------------------------------------------------------------------
+SPLIT_ITEM_LIMIT = 10  # 精确求解的购物车件数上限，超过则退化为单订单（不拆）
+
+
+def _partitions(seq: List[Item], max_blocks: int):
+    """生成 seq 的所有「至多 max_blocks 个非空块」的集合划分。"""
+    seq = list(seq)
+
+    def rec(i: int, blocks: List[List[Item]]):
+        if i == len(seq):
+            yield [list(b) for b in blocks]
+            return
+        x = seq[i]
+        for b in blocks:
+            b.append(x)
+            yield from rec(i + 1, blocks)
+            b.pop()
+        if len(blocks) < max_blocks:
+            blocks.append([x])
+            yield from rec(i + 1, blocks)
+            blocks.pop()
+
+    yield from rec(0, [])
+
+
+def _block_discount(combo: List[Coupon], block: List[Item], delivery_fee: float) -> float:
+    """一个订单块使用券子集 combo 后的优惠额（免配送费最多减免一次）。"""
+    disc = 0.0
+    has_fd = False
+    for c in combo:
+        if c.kind == "free_delivery":
+            has_fd = True
+            continue
+        disc += _coupon_discount(c, block)
+    if has_fd:
+        disc += delivery_fee
+    return disc
+
+
+def _assign_best(
+    blocks: List[List[Item]],
+    coupons: List[Coupon],
+    delivery_fee: float,
+    max_coupons_per_order: Optional[int],
+):
+    """给每个块分配**互不重复**的券（每块 <= max_coupons_per_order 张），求最小总价。
+
+    返回 (best_total, assignment)。assignment 为与 blocks 等长的「券 id 列表」列表。
+    采用 DFS + 剪枝：累计成本已不低于当前最优即剪掉。
+    """
+    subtotals = [sum(it.price for it in b) for b in blocks]
+    state = {"best": float("inf"), "assign": None}
+
+    def rec(i: int, used_ids: set, acc: float, assign: List[List[str]]):
+        if acc - 1e-9 >= state["best"]:
+            return
+        if i == len(blocks):
+            total = round(acc, 2)
+            if total < state["best"] - 1e-9:
+                state["best"] = total
+                state["assign"] = [list(a) for a in assign]
+            return
+        block = blocks[i]
+        avail = [c for c in coupons if c.id not in used_ids]
+        maxk = max_coupons_per_order if max_coupons_per_order is not None else len(avail)
+        for r in range(0, min(maxk, len(avail)) + 1):
+            for combo in combinations(avail, r):
+                cl = list(combo)
+                if not _is_valid_subset(cl, block, delivery_fee, max_coupons_per_order):
+                    continue
+                disc = _block_discount(cl, block, delivery_fee)
+                cost = subtotals[i] + delivery_fee - disc
+                assign.append([c.id for c in cl])
+                rec(i + 1, used_ids | {c.id for c in cl}, acc + cost, assign)
+                assign.pop()
+
+    rec(0, set(), 0.0, [])
+    return state["best"], state["assign"]
+
+
+def optimize_split_orders(
+    items: List[Item],
+    coupons: List[Coupon],
+    delivery_fee: float = 0.0,
+    *,
+    max_orders: int = 3,
+    max_coupons_per_order: Optional[int] = 1,
+    strategy: str = "auto",
+) -> dict:
+    """把购物车拆成多单、每单配一张最优券，求全局最低总价。
+
+    真实动机：麦当劳每单仅支持一张券（`calculate-price` 传两张返回
+    code=600022「暂不支持多张券使用」）。当手里有多张作用于**不同商品**的券时，
+    「拆成多单、每单用一张」可能比「一单只用一张」更省；但外送每单都要付配送费，
+    拆单未必划算。本函数在「每单至多一张券」约束下统一权衡、求全局最低价。
+
+    参数：
+        delivery_fee: 每单配送费（到店为 0；外送拆 N 单即付 N 份）。
+        max_orders:   最多允许拆成几单（默认 3），用于限制搜索规模。
+        max_coupons_per_order: 每单最大券数（真实 MCP 为 1，缺省 1；None 不限）。
+        strategy:     "auto"（默认，规模允许时精确求解）/ "single"（强制不拆）。
+
+    返回：
+        {
+            "original_total":     全车一单不用券的总价（商品 + 单笔配送费）
+            "best_total":         拆分后最低总价
+            "single_order_total": 不拆时的最优总价（对照基线）
+            "saved":              相比 original_total 的节省
+            "n_orders":           实际单数
+            "split":              是否发生拆分
+            "orders": [ {"items":[name...], "coupon_ids":[...], "subtotal":float,
+                         "delivery_fee":float, "discount":float, "payable":float}, ... ]
+            "strategy_used":      "exact" / "single"
+        }
+    """
+    original_total = total_price(items, delivery_fee)
+    # 0 优惠券对任何划分都无贡献，安全剪枝（与 optimize_coupons 一致）
+    usable = _prune_zero_value(coupons, items, delivery_fee)
+    coupon_by_id = {c.id: c for c in coupons}
+
+    single = optimize_coupons(
+        items, usable, delivery_fee, max_coupons_per_order=max_coupons_per_order
+    )
+
+    n = len(items)
+    can_split = strategy != "single" and 2 <= n <= SPLIT_ITEM_LIMIT and len(usable) >= 1
+
+    best_total = single["best_total"]
+    best_blocks: List[List[Item]] = [list(items)]
+    best_assign: List[List[str]] = [list(single["best_coupons"])]
+
+    if can_split:
+        cap = max(1, min(max_orders, n, len(usable) + 1))
+        for part in _partitions(items, cap):
+            total, assign = _assign_best(part, usable, delivery_fee, max_coupons_per_order)
+            if assign is None:
+                continue
+            if total < best_total - 1e-9:
+                best_total = total
+                best_blocks = part
+                best_assign = assign
+
+    orders = []
+    for blk, ids in zip(best_blocks, best_assign):
+        cs = [coupon_by_id[i] for i in ids if i in coupon_by_id]
+        sub = round(sum(it.price for it in blk), 2)
+        disc = round(_block_discount(cs, blk, delivery_fee), 2)
+        orders.append(
+            {
+                "items": [it.name for it in blk],
+                "coupon_ids": list(ids),
+                "subtotal": sub,
+                "delivery_fee": round(delivery_fee, 2),
+                "discount": disc,
+                "payable": round(sub + delivery_fee - disc, 2),
+            }
+        )
+
+    return {
+        "original_total": round(original_total, 2),
+        "best_total": round(best_total, 2),
+        "single_order_total": round(single["best_total"], 2),
+        "saved": round(original_total - best_total, 2),
+        "n_orders": len(best_blocks),
+        "split": len(best_blocks) > 1,
+        "orders": orders,
+        "strategy_used": "exact" if can_split else "single",
+    }
+
+
 if __name__ == "__main__":
     # 演示：一个典型点餐场景
     demo_items = [
