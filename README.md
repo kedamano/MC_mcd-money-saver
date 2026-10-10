@@ -13,7 +13,7 @@
   <a href="https://github.com/kedamano/mcd-money-saver/issues"><img src="https://img.shields.io/github/issues/kedamano/mcd-money-saver" alt="GitHub issues"></a>
   <img src="https://img.shields.io/badge/license-参赛声明-brightgreen" alt="License">
   <img src="https://img.shields.io/badge/Python-3.11%2B-blue" alt="Python">
-  <img src="https://img.shields.io/badge/tests-95%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-142%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/MCP-35%20tools%20live-orange" alt="MCP">
   <img src="https://img.shields.io/badge/Contest-麦当劳MCP大赛-ffc72c" alt="Contest">
 </p>
@@ -82,7 +82,40 @@
 > 同一张券**到店可用、外送被拒**；外送每单固定多出配送费与打包费——这正是本 Skill
 > 提供 **拆分下单**（`optimize_split_orders`）时要权衡的真实成本。
 
-### 🔍 真机才挖得到的 6 条真实业务规则
+### 🍟 套餐比券更猛：真实「套餐 vs 单点」（省钱下界）
+
+> 真机实测才发现：**套餐才是最大的省钱空间**——单张券最多省 ¥6.30，而套餐动辄省 ¥10+。
+> 下表来自上海悦荟广场 `1450104` 的真实菜单 + `query-meal-detail`（2026-10-10 实测）。
+> 口径保守：单点合计**只累计能和菜单对上编码的组件**，故为**节省下界**（真实 ≥ 此值）。
+
+| 套餐 | 单点合计 | 套餐价 | **至少省** | 幅度 |
+|---|---:|---:|---:|---:|
+| 「苹」水相「鱼」套餐 | ¥54.00 | **¥36.00** | **¥18.00** | 33.3% |
+| 培根安格斯厚牛堡四件套 | ¥48.00 | **¥37.00** | **¥11.00** | 22.9% |
+| 龙焰鸡腿堡三件套 | ¥37.50 | **¥26.90** | **¥10.60** | 28.3% |
+| 龙焰芝士棒鸡腿堡三件套 | ¥40.50 | **¥29.90** | **¥10.60** | 26.2% |
+| 板烧鸡腿堡四件套 | ¥37.00 | **¥28.00** | **¥9.00** | 24.3% |
+
+> 代码：`combo_optimizer.rank_combo_deals` / `optimize_purchase`——在「买套餐 / 单点」之间
+> 求全局最低价；`plan_order_with_combos` 再把**套餐**与**券**二选一取更省。
+
+### 🏪 多店比价：同城同品不同价，别只去最近那家
+
+> 真机实测（上海南京东路商圈，`query-nearby-stores` searchType=2）：**同一件中薯条
+> 在不同门店差 ¥1.00**（多数店 ¥13.50，食品一店 `1450056` ¥14.50）。买「中薯条 + 鲜萃咖啡」：
+
+| 门店 | 距离 | 到手价 |
+|---|---:|---:|
+| 上海黄浦悦荟广场 `1450104` | 194 m | **¥23.00** ✅ |
+| 上海黄浦恒基名人购物中心 `1450449` | 230 m | ¥23.00 |
+| 上海黄浦福州路上海书城 `1450556` | 325 m | ¥23.00 |
+| 上海福州路 `1450441` | 603 m | ¥23.00 |
+| 上海食品一店 `1450056` | 496 m | ¥24.00 ⚠️ |
+
+> 代码：`store_optimizer.optimize_across_stores`——在**可接受距离内**比较多家门店到手价，
+> 求最低并量化「为省这笔钱要多走多少米」，不盲目推荐远店。
+
+### 🔍 真机才挖得到的 8 条真实业务规则
 
 1. **每单仅限一张券** — 一单同时传两张券，官方直接返回 `code=600022「暂不支持多张券使用」`。→ 本 Skill 的**真实核价路径默认 `max_coupons_per_order=1`**（`two_stage_optimize`），本地粗排同样遵守，避免排出官方必然拒绝的组合。
 2. **券锁定商品会被静默剔除** — `9900000119 美式中杯`、`9900000117 中杯奶铁` 是**券锁定商品**：无券时 `calculate-price` 直接把它们踢出订单（上海 ¥58 → ¥39、深圳只剩 ¥25.50 的巨无霸）。这正是本 Skill 用 `product_codes` 做「券 ↔ 商品」精确绑定、并**先绑定商品再核价**的现实依据。
@@ -90,8 +123,10 @@
 4. **折扣与券面精确吻合** — 美式中杯 ¥19.00 × 0.7 = ¥13.30（`discount=570` 分）；中杯奶铁 ¥21.00 × 0.7 = ¥14.70（`discount=630` 分），服务端权威价与本地模型一致。
 5. **券有渠道限制** — 标注「到店专用」的券（如新人专享 7 折）用于外送核价返回 `code=600012「当前优惠券不可用！」`，到店则正常生效。→ 选券必须校验 `orderType`，否则会报出"算得省、下单废"的假方案。
 6. **外送链路全程要 `beCode`** — 外送(beType=2)下 `query-meals` / `query-store-coupons` / `calculate-price` 不传 `beCode` 一律返回 `code=600048「必传beCode」`；`beCode` 来自 `delivery-query-stores`（须先 `delivery-create-address` 建地址）。外送商品 `code` 与到店**不通用**（到店下单会报 `60006 不可售`）。
+7. **促销对企业团餐专属** — `query-promotions` 返回的 12 条规则 `beTypes` **全部为 `["6"]`（企业团餐）**，普通到店/外送拿不到。→ 本项目**诚实地不把促销当卖点**，省钱候选收缩为真实可用的「券 + 套餐」。
+8. **`auto-bind-coupons` 返回纯文本而非 JSON** — 误用 `call_tool` 会抛「text 中未找到业务 JSON」，必须用 `call_tool_text`；这正是它此前长期没被接进来的根因。实测领取后**门店券 2→3、我的券 2→7**（白拿 5 张）。
 
-**自动化验证**：`pytest` 回归 **94 passed（离线 90 + 真实 live 4；另有 1 例真实下单受保护、默认跳过）**，共 95 用例。其中 `test_live_end_to_end` 走项目自带 Python 客户端（`mcd_client.py`，纯标准库）真实连通 `initialize → list_tools(35) → now-time-info`；`test_live_calibration` 用真实返回值校准本地价格模型与官方一致；`test_scale_pruning` / `test_topk_pruning` 以 40 组随机用例证明**分支限界与暴力枚举同解**（单最优 + Top-K 两条路径）；`test_one_coupon_rule` 锁定**每单至多一张券**的真实规则；`test_split_orders` 以暴力基准验证**拆分下单**（含外送配送费权衡）；`test_delivery_contract` 锁定**外送配送费/打包费构成与券渠道限制**。
+**自动化验证**：`pytest` 回归 **142 用例**（离线 **137 passed** + 真实 live **4** + 1 例真实下单受保护默认跳过）。其中 `test_live_end_to_end` 走项目自带 Python 客户端（`mcd_client.py`，纯标准库）真实连通 `initialize → list_tools(35) → now-time-info`；`test_live_calibration` 用真实返回值校准本地价格模型与官方一致；`test_scale_pruning` / `test_topk_pruning` 以 40 组随机用例证明**分支限界与暴力枚举同解**（单最优 + Top-K 两条路径）；`test_one_coupon_rule` 锁定**每单至多一张券**；`test_split_orders` 验证**拆分下单**（含外送配送费权衡）；`test_delivery_contract` 锁定**外送配送费/打包费构成与券渠道限制**；`test_auto_bind` 锁定**领券扩池**；`test_combo_optimizer` 以暴力基准验证**套餐最优购买**；`test_store_optimizer` 验证**多店比价 + 距离权衡**；`test_promotions_scope` 锁定**促销仅企业团餐**的真实结论。
 
 > 🎬 **想看完整真实链路？** 运行 `MCD_MCP_TOKEN=xxx python examples/demo_live.py`，
 > 一条命令跑通「时间 → 门店 → 菜单 → 优惠券 → 官方核价」，样例输出见 [`DEMO.md`](DEMO.md)。
@@ -146,13 +181,15 @@ flowchart LR
 | 最优叠加组合 | 满减 / 折扣 / 立减 / 免配送费 自动求最低价；**大券池走分支限界**（n=20 时较暴力枚举快 ~260×，与暴力枚举**同解**）|
 | 🔀 **拆分下单** | 真实「每单一张券」下，把购物车拆成多单、每单配一张最优券，并权衡外送多出的配送费，求**全局最低价**（`optimize_split_orders`，含与暴力基准同值校验）|
 | 🛵 **到店 / 外送双场景** | 外送链路（建地址 → 外送门店 `beCode` → 含配送费/打包费核价）完整支持，并校验券渠道（到店专用券外送自动排除）|
+| 🍟 **套餐纳入优化** | 不只比券：把「买套餐」作为候选方案，在「套餐 / 单点」间求全局最低价（真实套餐最多省 **¥18.00**）；`plan_order_with_combos` 将套餐与券二选一 |
+| 🏪 **多店比价 + 距离权衡** | 不再只取最近店：在可接受距离内比较多家门店同品价格×券，求最优并量化「多走几米省几元」（实测同城同品差 ¥1.00）|
+| 🎫 **一键领券扩池** | 真实接入 `auto-bind-coupons`（`call_tool_text` 解析纯文本），领券后自动重查三池再比价；实测我的券 2→7 |
 | 类目 & 互斥约束 | 支持类目限定券；订单级券至多一张，贴合真实规则 |
 | 🅱️ **产品级绑定** | 券按 `product_codes` 精确匹配，错配自动失效（券锁定商品也能正确处理）|
 | 🅲️ **凑单建议** | 距满减门槛差 X 元时，反推最小代价加购组合，净亏不推 |
 | 🅳️ **两阶段核价** | 本地枚举 Top-K → 仅少量候选调官方 `calculate-price` 取权威价 |
 | 🅴️ **时效与库存** | 过期券自动剔除、**未生效/每日时段窗**（如仅 05:00-23:59 可用）校验、不可售商品提示移出优惠范围 |
 | 官方核价兜底 | 用 `calculate-price` 校验，避免"算得美、下单贵" |
-| 一键领券扩池 | `auto-bind-coupons` 自动领取麦麦省券再比价 |
 | 🛡️ **健壮性** | MCP 偶发 404/5xx/429 **自动重试 + 熔断**（下单等副作用调用禁用重试）；门店/菜单/券 **TTL 缓存**；`scripts/doctor.py` 一键排查配置坑 |
 
 ---
@@ -202,12 +239,13 @@ flowchart LR
 核心算法与真实接口解析均可离线测试，不依赖麦当劳 MCP：
 
 ```bash
-python -m pytest tests/ -q                 # 离线：90 例全过（含真实合同测试）
+python -m pytest tests/ -q                 # 离线：137 例全过（含真实合同测试）
 python scripts/doctor.py                   # 环境自检：查 mcp.json 的 type / Token 前缀
 python src/coupon_optimizer.py             # 内置演示（基础优化器）
 python examples/demo_smart.py              # B/C/D/E 离线演示
 MCD_MCP_TOKEN=xxx pytest -m live -q        # 可选：真实端到端冒烟（initialize→list_tools→call_tool）
 MCD_MCP_TOKEN=xxx python examples/demo_live.py           # ⭐ 真实端到端演示（选店→拉券→官方核价）
+MCD_MCP_TOKEN=xxx python examples/demo_advanced.py       # ⭐ 进阶：领券扩池 + 套餐省钱 + 多店比价
 MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 两阶段真实官方核价演示
 ```
 
@@ -231,6 +269,8 @@ mcd-money-saver/
 │   ├── coupon_adapter.py       # 真实券 JSON -> 领域 Coupon（含 product_codes/expires_at）
 │   ├── coupon_pools.py         # 三池聚合：门店券(JSON) / 我的券 / 麦麦省券(Markdown) 解析
 │   ├── coupon_smart.py         # C 凑单建议 + D 两阶段校验（智能决策增强）
+│   ├── combo_optimizer.py      # 🍟 套餐优化：套餐 vs 单点求最低价 + 套餐/券二选一
+│   ├── store_optimizer.py      # 🏪 多店比价 + 距离权衡（同城同品不同价）
 │   └── mcd_client.py           # 麦当劳 MCP 真实客户端（含 price_combo 官方核价）
 ├── tests/
 │   ├── test_coupon_optimizer.py# TDD 测试契约（基础优化器）
@@ -243,12 +283,17 @@ mcd-money-saver/
 │   ├── test_split_orders.py    # 拆分下单：与暴力基准同值 + 外送配送费权衡
 │   ├── test_delivery.py        # 外送链路请求体构造（地址/门店/beCode，离线）
 │   ├── test_delivery_contract.py# 外送真实返回契约（配送费/打包费/券渠道限制）
+│   ├── test_auto_bind.py       # 一键领券扩池（call_tool_text + 前后对比）
+│   ├── test_combo_optimizer.py # 套餐 vs 单点（与暴力基准同解 + 真实节省下界）
+│   ├── test_store_optimizer.py # 多店比价 + 距离权衡 + 门店券解析
+│   ├── test_promotions_scope.py# 真实结论：促销仅企业团餐（beTypes=["6"]）
 │   ├── test_live_calibration.py# 本地价格模型 vs 官方核价（live 校准）
 │   ├── test_mcd_client.py      # 客户端解析单测 + 可选真实冒烟(-m live)
 │   └── fixtures/               # 真实 calculate-price 返回 + 真实菜单目录（脱敏）
 ├── examples/
 │   ├── demo_smart.py           # B/C/D/E 端到端演示（离线 / --live）
-│   └── demo_live.py            # ⭐ 真实 MCP 端到端演示（选店→拉券→官方核价）
+│   ├── demo_live.py            # ⭐ 真实 MCP 端到端演示（选店→拉券→官方核价）
+│   └── demo_advanced.py        # ⭐ 进阶：领券扩池 + 套餐省钱 + 多店比价
 ├── .github/workflows/ci.yml    # GitHub Actions：每次 push 自动跑离线测试
 ├── scripts/
 │   ├── doctor.py               # 环境自检：排查 mcp.json type / Token 前缀 / 握手
