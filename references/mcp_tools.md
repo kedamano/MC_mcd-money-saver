@@ -59,3 +59,19 @@
 - `productList[]`：`productCode / productName / quantity / originalSubtotal / subtotal`
 - `takeWayList[]`：`code`（eat-in 堂食 / locker-out 外带）、`title`、`subtitle`
 - ✅ 实测：传入 `couponCode + couponId` 后 `discount` 正确体现优惠（如美式中杯7折：19.00→13.30）
+
+### 外送场景（麦乐送）链路（2026-10-10 实测）
+
+外送比到店多两步：**建地址 → 取外送门店(beCode)**。
+
+1. `delivery-query-addresses` 无必填，返回 `{"addresses":[{addressId, fullAddress, ...}]}`。
+2. `delivery-create-address` 必填 `city` / `address` / `addressDetail` / `contactName` / `phone`（11 位纯数字），
+   返回新地址（含 `addressId`）。
+3. `delivery-query-stores` 必填 `beType`(2=麦乐送，6=团餐) + `addressId`，返回门店含 **`storeCode` 与 `beCode`**。
+4. ⚠️ **外送全程必传 `beCode`**：`query-meals` / `query-store-coupons` / `calculate-price` 在外送
+   (beType=2/5/6) 缺 `beCode` 一律返回 `code=600048「外送场景下，beType=2/5/6时必传beCode」`。
+5. 外送 `calculate-price` 额外返回 **`deliveryPrice`（配送费）** 与 **`packingPrice`（打包服务费）**；
+   打包服务费以独立商品行 `productCode=920174`（`subtotal=0`）出现。**总价 = 原价 − `discount`**，
+   其中 `productPrice` 已扣 `discount`，不要二次相减。折扣可能来自**商品自身促销价**而非券。
+6. ⚠️ **券有渠道限制**：标注「到店专用」的券用于外送返回 `code=600012「当前优惠券不可用！」`；
+   同一张券到店正常生效。外送商品 `code` 与到店**不通用**（拿外送码去到店下单报 `60006 不可售`）。
