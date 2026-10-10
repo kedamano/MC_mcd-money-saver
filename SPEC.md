@@ -27,7 +27,7 @@
 | FR-8 | 产品级绑定 | 券 `product_codes` 非空时仅作用于绑定商品（`_eligible_items`），避免错配类目 |
 | FR-9 | 凑单建议 | 对未达门槛的满减券，从目录反推最小代价加购组合，`net_saving<=0` 不推荐 |
 | FR-10 | 时效与库存 | 按 `expires_at` 剔除过期券（`filter_valid_coupons`）；`Item.available=False` 提示并移出优惠范围 |
-| FR-11 | 两阶段核价 | 本地求解 Top-K 候选（小券池暴力枚举、大券池分支限界），仅对 K 个调官方 `calculate-price` 取权威价（`two_stage_optimize`），规避 2^n 次调用 |
+| FR-11 | 两阶段核价 | 本地求解 Top-K 候选（小券池暴力枚举、大券池分支限界），仅对 K 个调官方 `calculate-price` 取权威价（`two_stage_optimize`），规避 2^n 次调用；**默认每单至多一张券（`max_coupons_per_order=1`）**，与真实 MCP 规则一致 |
 | FR-12 | 生效时间与时段窗 | 按 `valid_from`（未生效）、每日 `time_windows`（如仅 05:00-23:59 可用，支持跨零点）与 `expires_at` 三重过滤（`filter_active_coupons`）|
 | FR-13 | 下单链路 | 到店下单须先由 `calculate-price` 取 `takeWayList[].code` 作为 `takeWayCode`，再调 `create-order`（`mcd_client.create_order` / `pick_take_way`）；须用户显式确认 |
 
@@ -58,6 +58,7 @@
 | 时效单测 | `tests/test_time_window.py` | 生效日期 / 每日时段窗 / 跨零点窗过滤 |
 | 规模单测 | `tests/test_scale_pruning.py` | 大规模券剪枝 + 分支限界：与暴力枚举同解（40 组随机种子）、0 优惠券剪枝安全性、约束一致性、剪枝节点压缩 |
 | Top-K 单测 | `tests/test_topk_pruning.py` | `rank_candidates` 的 Top-K 分支限界：与暴力枚举同值（40 组随机种子 × K∈{1,3,5}）、K 名上界剪枝、大券池可用性 |
+| 券数上限单测 | `tests/test_one_coupon_rule.py` | 真实规则「每单至多一张券」：默认保留组合能力、`max_coupons_per_order=1` 时暴力/分支限界同解、Top-K 候选与 `two_stage_optimize` 均遵守上限 |
 | 合同测试 | `tests/test_real_contract.py` | 基于真实 `calculate-price` 返回，断言客户端模型与服务器一致 |
 | 真实校准 | `tests/test_live_calibration.py`（`-m live`） | 用真实返回值校准本地价格模型与官方一致 |
 | 真实冒烟 | `tests/test_mcd_client.py::test_live_end_to_end`（`-m live`） | 真实连接完成 `initialize→list_tools→call_tool`，默认跳过 |
@@ -65,7 +66,7 @@
 
 运行：
 ```bash
-python -m pytest tests/ -q                 # 离线：63 例全过
+python -m pytest tests/ -q                 # 离线：68 例全过
 MCD_MCP_TOKEN=xxx pytest -m live -q        # 真实端到端（可选，4 例 live）
 python examples/demo_smart.py              # B/C/D/E 离线演示
 MCD_MCP_TOKEN=xxx python examples/demo_live.py           # 真实端到端演示（选店→三池→官方核价）
@@ -88,6 +89,7 @@ MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 真实官方核价�
 | **C1** | 健壮性：瞬时错误(404/5xx/429)指数退避重试 + 熔断（副作用调用禁用重试）；读接口 TTL 缓存；环境自检脚本 | `mcd_client._post`/`call_tool_cached` / `scripts/doctor.py` | ✅ |
 | **C2** | 大规模券剪枝 + 分支限界：券数 >16 自动切 B&B（先剔 0 优惠券，再按乐观上界剪枝），与暴力枚举**同解**；实测 n=20 提速 ~260× | `coupon_optimizer._optimal_subset_bnb` / `_prune_zero_value` / `optimize_coupons(strategy=...)` | ✅ |
 | **C3** | Top-K 候选分支限界：`rank_candidates` 用「大小为 K 的最小堆 + 第 K 名上界剪枝」代替全枚举，与暴力枚举**同值**；实测 n=18 提速 ~180× | `coupon_optimizer._rank_candidates_bnb` / `rank_candidates(strategy=...)` | ✅ |
+| **C4** | 真实规则「每单至多一张券」：真机实测传两张券返回 `code=600022「暂不支持多张券使用」`，优化器新增 `max_coupons_per_order`（真实核价路径默认 1），暴力/分支限界/两阶段一致遵守 | `coupon_optimizer.optimize_coupons` / `rank_candidates` / `coupon_smart.two_stage_optimize` | ✅ |
 
 > **关键 Bug 修复（真机联调发现，均补了回归测试）**：
 > 1. `calculate-price` 返回 `{success,code,message,data:{...}}`，需拆到最内层 `data`，否则取到 `price=None` 核价归零；
