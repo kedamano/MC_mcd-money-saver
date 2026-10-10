@@ -27,6 +27,11 @@ agent_created: true
 
 ### 1. 选门店
 - 到店：调用 `query-nearby-stores` 拿到附近门店，请用户确认目标门店。
+  > 🏪 **多店比价（真实有收益）**：同城**同品不同价**是真实存在的（实测中薯条
+  > 多数店 ¥13.50、食品一店 ¥14.50）。若用户对价格敏感，用
+  > `query-nearby-stores`（`searchType=2`，返回带 `distance` 米）取多家门店，
+  > 调 `store_optimizer.collect_store_quotes` + `optimize_across_stores(quotes, wanted, max_distance_m=…)`
+  > 在**可接受距离内**求到手价最低的门店，并给出「多走 N 米、省 ¥X」的权衡。
 - 外送：先 `delivery-query-addresses` 取配送地址（为空则 `delivery-create-address` 创建），
   再用 `delivery-query-stores`（`beType=2`）查可配送门店，**记下门店的 `beCode`**。
   > ⚠️ **外送全程必传 `beCode`**：`query-meals` / `query-store-coupons` / `calculate-price`
@@ -44,7 +49,11 @@ agent_created: true
 - `query-store-coupons` —— 当前门店可用券
 - `query-my-coupons` —— 账户已有券
 - `available-coupons` —— 可领取的麦麦省券
-- （可选）`auto-bind-coupons` —— 一键领取麦麦省券，扩充券池后再查一次 `query-my-coupons`
+- `auto-bind-coupons` —— **一键领取**麦麦省券（实测领后门店券 2→3、我的券 2→7），
+  再重查三池。推荐直接用 `coupon_pools.collect_and_bind_coupons(client, store_code)` 封装
+  （它会自动领券 + 前后对比 + 重聚合）。
+  > ⚠️ `auto-bind-coupons` **无入参且返回纯文本非 JSON**，必须用 `client.call_tool_text`；
+  > 即使异常也应容错继续（`collect_and_bind_coupons` 已处理）。
 
 > ⚠️ **真实结构差异（真机实测）**：三池**返回格式不同**，不能一视同仁——
 > - `query-store-coupons` 返回**结构化 JSON**（含 `couponCode`/`couponId`/`products`）
@@ -97,6 +106,17 @@ print(optimize_coupons(items, coupons, delivery_fee=6.0))
 > 调 `optimize_split_orders(items, coupons, delivery_fee, max_orders=3)` 求「拆成多单、每单配一张券」
 > 的**全局最低价**；外送时每单都要付配送费，算法会自动判断拆分是否真的划算。
 > 返回 `orders[]` 给出每单的商品与用券明细。
+
+> 🍟 **套餐往往比券更省（别漏了！）**：真实实测套餐动辄省 ¥10~18（如「龙焰鸡腿堡三件套」
+> 单点 ¥37.50 → 套餐 ¥26.90），而单张券最多省 ¥6.30。流程：
+> 1. 从 `query-meals` 里挑名称含「套餐/三件套/四件套/随心选」的商品；
+> 2. 逐个 `query-meal-detail`（入参用 `code`，非 `productCode`），用
+>    `combo_optimizer.combo_from_detail(detail, price, price_map)` 解析套餐默认组件；
+> 3. `rank_combo_deals(combos, price_map)` 排出「更划算的套餐」；
+> 4. 需要最终决策时调 `plan_order_with_combos(wanted, price_map, combos, coupons=…, name_map=…)`
+>    —— 它在「纯单点+券」与「套餐+剩余单点+券」之间**二选一取更省**。
+> > 口径：菜单独立商品编码与套餐内组件编码可能不同（如可乐），单点合计只累计**能对上编码**的组件，
+> > 故节省为**下界**（真实只会更多），不会虚报。
 
 ### 5. 用官方接口核价（关键）
 用优化器给出的 `best_coupons` 调用 `calculate-price`，传入商品列表与对应券，
