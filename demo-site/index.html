@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>麦麦省钱助手 · 麦当劳 MCP 最优省钱点单</title>
+<meta name="description" content="基于麦当劳中国 MCP 的省钱点单 Skill：聚合三池优惠券、自动比价凑单，并用官方 calculate-price 核价复核。">
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#141821; --panel2:#1a1f2b; --line:#252d3f;
+    --txt:#e9eef8; --dim:#93a0b9; --muted:#6b7793;
+    --gold:#ffc72c; --gold2:#ffdc6b; --red:#da291c; --red2:#ff6b5e;
+    --green:#3ddc97; --blue:#5aa9ff;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:
+      radial-gradient(1100px 560px at 12% -8%,#2a1a14 0%,transparent 60%),
+      radial-gradient(900px 500px at 92% 4%,#1a2440 0%,transparent 55%),
+      var(--bg);
+    color:var(--txt);font:15px/1.7 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+  a{color:var(--gold2)}
+
+  /* ---------- HERO ---------- */
+  header{padding:52px 0 34px}
+  .badge{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--gold);
+    border:1px solid rgba(255,199,44,.35);background:rgba(255,199,44,.08);
+    padding:5px 13px;border-radius:999px;font-weight:700;letter-spacing:.02em}
+  h1{font-size:clamp(28px,5vw,46px);line-height:1.2;margin:18px 0 14px;letter-spacing:-1px}
+  h1 .hl{color:var(--gold)}
+  .lead{color:var(--dim);font-size:16px;max-width:760px;margin:0 0 24px}
+  .lead b{color:var(--txt)}
+  .cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:11px;
+    font-weight:700;font-size:14.5px;text-decoration:none;border:1px solid transparent;transition:.15s}
+  .btn-p{background:linear-gradient(135deg,var(--gold),#ffb400);color:#22180a}
+  .btn-p:hover{transform:translateY(-1px);box-shadow:0 10px 26px -12px rgba(255,199,44,.75)}
+  .btn-s{border-color:var(--line);color:var(--txt);background:var(--panel)}
+  .btn-s:hover{border-color:#3a4763}
+  .tiny{color:var(--muted);font-size:12.5px}
+
+  /* ---------- 体验区 ---------- */
+  section{padding:34px 0}
+  h2{font-size:21px;margin:0 0 6px;display:flex;align-items:center;gap:10px;letter-spacing:-.3px}
+  h2::before{content:"";width:4px;height:20px;background:var(--red);border-radius:2px}
+  .sub{color:var(--dim);font-size:13.5px;margin:0 0 20px}
+
+  .store{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;
+    background:linear-gradient(135deg,#1b2130,#141821);border:1px solid var(--line);
+    border-radius:15px;padding:16px 20px;margin-bottom:16px}
+  .store .name{font-size:17px;font-weight:700}
+  .store .addr{color:var(--dim);font-size:13px;margin-top:3px}
+  .store .meta{display:flex;gap:22px;text-align:right}
+  .store .meta div{font-size:12px;color:var(--muted)}
+  .store .meta b{display:block;font-size:16px;color:var(--gold);font-weight:800}
+
+  .cols{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;align-items:start}
+  @media(max-width:860px){.cols{grid-template-columns:1fr}.store .meta{text-align:left;gap:16px}}
+
+  .picker{display:flex;flex-direction:column;gap:10px}
+  .item{display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:15px 17px;cursor:pointer;transition:.15s;position:relative}
+  .item:hover{border-color:#37435e;background:#171c27}
+  .item:focus-within{outline:2px solid var(--gold);outline-offset:2px}
+  .item.on{border-color:rgba(255,199,44,.45);background:linear-gradient(135deg,#241d10,#151922)}
+  .item input{position:absolute;opacity:0;width:0;height:0}
+  .box{flex:0 0 21px;width:21px;height:21px;border-radius:6px;border:2px solid #3a465f;margin-top:2px;
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:transparent;transition:.15s}
+  .item.on .box{background:var(--gold);border-color:var(--gold);color:#241a00}
+  .item .body{flex:1;min-width:0}
+  .item .t{font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .item .n{color:var(--muted);font-size:12.5px;margin-top:3px}
+  .item .p{flex:0 0 auto;text-align:right;font-size:13px;color:var(--muted)}
+  .item .p b{display:block;font-size:17px;color:var(--txt);font-weight:800}
+  .item .p s{font-size:12px;color:var(--muted)}
+  .tag{font-size:11px;font-weight:800;padding:2.5px 8px;border-radius:6px;letter-spacing:.02em}
+  .t-promo{background:rgba(61,220,151,.14);color:var(--green)}
+  .t-coupon{background:rgba(218,41,28,.18);color:var(--red2)}
+  .t-none{background:rgba(90,169,255,.13);color:var(--blue)}
+
+  /* ---------- 结算卡 ---------- */
+  .bill{background:linear-gradient(180deg,#171c27,#12161e);border:1px solid var(--line);
+    border-radius:16px;padding:20px;position:sticky;top:18px}
+  .bill h3{margin:0 0 14px;font-size:15px;color:var(--dim);font-weight:700;letter-spacing:.02em}
+  .line{display:flex;justify-content:space-between;gap:12px;padding:8px 0;font-size:13.5px}
+  .line .k{color:var(--dim)}
+  .line.big{border-top:1px dashed var(--line);margin-top:8px;padding-top:14px;font-size:15px}
+  .line.big .v{font-size:26px;font-weight:800;color:var(--gold);letter-spacing:-.5px}
+  .save{margin-top:14px;background:rgba(61,220,151,.1);border:1px solid rgba(61,220,151,.3);
+    border-radius:12px;padding:12px 14px;font-size:13.5px;color:var(--green)}
+  .save b{font-size:19px}
+  .orders{margin:14px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+  .orders li{background:#0f131b;border:1px solid var(--line);border-radius:11px;padding:11px 13px;font-size:13px}
+  .orders .oh{display:flex;justify-content:space-between;gap:10px;font-weight:700;margin-bottom:3px}
+  .orders .od{color:var(--muted);font-size:12.5px}
+  .warn{margin-top:12px;background:rgba(218,41,28,.11);border:1px solid rgba(218,41,28,.34);
+    border-radius:12px;padding:12px 14px;font-size:13px;color:#ffb3ad}
+  .warn code{background:rgba(0,0,0,.4);padding:1px 6px;border-radius:5px;color:#ffd0cb;font-size:12px}
+
+  /* ---------- 说明 ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:18px 19px}
+  .card .ic{font-size:21px}
+  .card h4{margin:9px 0 7px;font-size:15px}
+  .card p{margin:0;color:var(--dim);font-size:13.5px}
+  .card code{background:#0a0d13;border:1px solid #222b3d;border-radius:5px;padding:1px 5px;font-size:12.5px;color:var(--gold2)}
+  footer{border-top:1px solid var(--line);margin-top:26px;padding:26px 0 46px;color:var(--muted);font-size:12.5px}
+  .note{background:rgba(90,169,255,.08);border:1px solid rgba(90,169,255,.28);border-radius:12px;
+    padding:12px 15px;color:#bcd6f5;font-size:13px;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <span class="badge">🍔 麦当劳程序员创意开发大赛参赛作品</span>
+    <h1>点麦当劳，<span class="hl">它帮你算到最省</span></h1>
+    <p class="lead">
+      一款基于 <b>麦当劳中国 MCP</b> 的 WorkBuddy 技能：自动聚合「门店券 + 我的券 + 麦麦省券」三池，
+      算最优凑单与拆单方案，<b>再用官方 <code>calculate-price</code> 核价复核</b>——
+      给你的是能真正下单的价格，不是估算。
+    </p>
+    <div class="cta">
+      <a class="btn btn-p" href="https://github.com/kedamano/mcd-money-saver" target="_blank" rel="noopener noreferrer">⭐ 去 GitHub 点个 Star</a>
+      <a class="btn btn-s" href="#demo">👇 先玩一下试试</a>
+    </div>
+    <p class="tiny">175 项测试（离线 170 全绿）· 真机联调 mcp.mcd.cn 35 个工具 · 覆盖到店与外送</p>
+  </header>
+
+  <section id="demo">
+    <h2>今日最省点法 · 实时算给你看</h2>
+    <p class="sub">勾选你想点的东西，下面立刻算出<b>最优下单方案</b>。数据为 <b>2026-10-10 15:44 深圳蛇口网谷餐厅真实核价快照</b>（非实时）。</p>
+
+    <div class="store">
+      <div>
+        <div class="name">🍟 麦当劳深圳蛇口网谷餐厅</div>
+        <div class="addr">南山区南海大道 1031 号 蛇口网谷万海大厦 A 座 106 房</div>
+      </div>
+      <div class="meta">
+        <div>距离<b>383 m</b></div>
+        <div>营业<b>07:00–21:00</b></div>
+        <div>店铺码<b>1420621</b></div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="picker" id="picker"></div>
+
+      <div class="bill" aria-live="polite">
+        <h3>结算台</h3>
+        <div class="line"><span class="k">原价合计（逐样单点）</span><span id="base">¥0.00</span></div>
+        <div class="line"><span class="k">优惠合计</span><span id="disc" style="color:var(--green)">−¥0.00</span></div>
+        <div class="line big"><span class="k">最省到手价</span><span class="v" id="total">¥0.00</span></div>
+
+        <div class="save" id="saveBox" hidden>比原价省 <b id="saveAmt">¥0.00</b></div>
+
+        <ul class="orders" id="orders"></ul>
+        <div class="warn" id="warnBox" hidden></div>
+      </div>
+    </div>
+
+    <div class="note">
+      ⚠️ <b>一个真实大坑：</b>把「套餐」和「券」放进<b>同一单</b>，官方会直接拒绝，返回
+      <code>code 600012「促销规则不支持该商品」</code>——券白瞎。
+      在深圳这个案例里，同单到手 <b>¥38.80</b>，<b>拆成两单只要 ¥36.80</b>。这就是本 Skill 要做「拆单」的原因。
+    </div>
+  </section>
+
+  <section>
+    <h2>它和"优惠券计算器"有什么区别</h2>
+    <p class="sub">省钱主题的项目很多，真正决定体验的是这三点。</p>
+    <div class="cards">
+      <div class="card">
+        <div class="ic">✅</div>
+        <h4>官方核价，不是估算</h4>
+        <p>本地算出候选方案后，会把 Top 候选送进麦当劳官方 <code>calculate-price</code> 取权威金额。
+        别人给你"大约省 15 元"，它给你"到手 ¥36.80"。</p>
+      </div>
+      <div class="card">
+        <div class="ic">🚫</div>
+        <h4>拒绝"算得省、下单废"</h4>
+        <p>券被官方拒绝（渠道不符 / 促销互斥）时返回的是 <code>600012</code> 而非金额。
+        它把「业务拒绝」和「网络抖动」严格区分，<b>被拒的方案永远不会被算成最便宜</b>。</p>
+      </div>
+      <div class="card">
+        <div class="ic">🔀</div>
+        <h4>该拆单就拆单</h4>
+        <p>真实规则是「每单一张券」「套餐与券互斥」。它会把购物车拆成多单，
+        每单配一张最优券，并权衡外送多出的配送费，求全局最低价。</p>
+      </div>
+      <div class="card">
+        <div class="ic">🎫</div>
+        <h4>三池券一起算</h4>
+        <p>门店券、我的券、麦麦省券返回结构完全不同（JSON / Markdown / Markdown），
+        它分别解析、去重、还能<b>一键领券扩池</b>后再重算。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>怎么用</h2>
+    <p class="sub">在 WorkBuddy 里装好技能，之后一句话就行。</p>
+    <div class="card" style="font-family:ui-monospace,Consolas,monospace;font-size:13.5px;line-height:2">
+      <div style="color:var(--muted)"># 你直接说：</div>
+      <div>「今天去深圳蛇口网谷，怎么点最省钱？」</div>
+      <div style="color:var(--muted);margin-top:10px"># 它会做：</div>
+      <div>选门店 → 拉菜单 → 收三池券 → 算最优组合 → <span style="color:var(--gold2)">官方核价</span> → 给拆单方案</div>
+      <div style="color:var(--muted);margin-top:10px"># 仓库：</div>
+      <div><a href="https://github.com/kedamano/mcd-money-saver" target="_blank" rel="noopener noreferrer">github.com/kedamano/mcd-money-saver</a></div>
+    </div>
+    <div class="cta" style="margin-top:20px">
+      <a class="btn btn-p" href="https://github.com/kedamano/mcd-money-saver" target="_blank" rel="noopener noreferrer">⭐ 点个 Star 支持一下</a>
+      <span class="tiny">Star 会计入大赛排名，谢谢 🙏</span>
+    </div>
+  </section>
+
+  <footer>
+    数据来源：麦当劳中国 MCP Server（<code>mcp.mcd.cn</code>）真实调用返回，采集于 2026-10-10 15:44（北京时间），
+    门店 <b>1420621</b>。本页面为**离线演示**，用真实快照数据复现计算逻辑，不连接实时接口、不涉及任何账号信息。<br>
+    麦麦省钱助手 · 麦当劳程序员创意开发大赛参赛作品 · 本页面金额均来自官方 <code>calculate-price</code> 返回，未做美化性修改。
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- 真实菜单与券（2026-10-10 深圳蛇口网谷 1420621，官方核价快照）----
+  var MENU = [
+    {
+      id: "combo", emoji: "🍔", name: "龙焰鸡腿堡三件套",
+      note: "龙焰鸡腿堡 + 中薯条 + 中可乐 · 单点同款 ¥47.00",
+      alaCarte: 47.00, kind: "promo", tag: "套餐 · 省 ¥20.10",
+      price: 26.90, show: 26.90
+    },
+    {
+      id: "amer", emoji: "☕", name: "麦咖啡 中杯冰美式",
+      note: "9.9 元中杯冰美式券（今日可用）",
+      alaCarte: 19.00, kind: "coupon", tag: "券 · 省 ¥9.10",
+      price: 9.90, show: 9.90
+    },
+    {
+      id: "latte", emoji: "🥛", name: "麦咖啡 中杯奶铁",
+      note: "新人专享 7 折券（每日 05:00–23:59）",
+      alaCarte: 21.00, kind: "coupon", tag: "券 · 省 ¥6.30",
+      price: 14.70, show: 14.70
+    },
+    {
+      id: "mcflurry", emoji: "🍦", name: "麦旋风（买一送一）",
+      note: "10:00–22:00 · 两个只花一个钱",
+      alaCarte: 31.00, kind: "coupon", tag: "券 · 省 ¥15.50",
+      price: 15.50, show: 15.50
+    }
+  ];
+
+  var state = { combo: true, amer: true, latte: false, mcflurry: false };
+
+  var pickerEl = document.getElementById("picker");
+  var baseEl = document.getElementById("base");
+  var discEl = document.getElementById("disc");
+  var totalEl = document.getElementById("total");
+  var saveBox = document.getElementById("saveBox");
+  var saveAmt = document.getElementById("saveAmt");
+  var ordersEl = document.getElementById("orders");
+  var warnBox = document.getElementById("warnBox");
+
+  function yuan(n) { return "¥" + n.toFixed(2); }
+
+  // 渲染可选商品
+  MENU.forEach(function (m) {
+    var lab = document.createElement("label");
+    lab.className = "item" + (state[m.id] ? " on" : "");
+    lab.setAttribute("for", "chk-" + m.id);
+    var tagCls = m.kind === "promo" ? "t-promo" : (m.kind === "coupon" ? "t-coupon" : "t-none");
+    lab.innerHTML =
+      '<input type="checkbox" id="chk-' + m.id + '"' + (state[m.id] ? " checked" : "") + '>' +
+      '<span class="box" aria-hidden="true">✓</span>' +
+      '<span class="body">' +
+        '<span class="t">' + m.emoji + " " + m.name +
+          '<span class="tag ' + tagCls + '">' + m.tag + "</span></span>" +
+        '<span class="n">' + m.note + "</span>" +
+      "</span>" +
+      '<span class="p"><b>' + yuan(m.price) + "</b><s>" + yuan(m.alaCarte) + "</s></span>";
+    lab.querySelector("input").addEventListener("change", function (e) {
+      state[m.id] = e.target.checked;
+      lab.classList.toggle("on", e.target.checked);
+      render();
+    });
+    pickerEl.appendChild(lab);
+  });
+
+  function render() {
+    var picked = MENU.filter(function (m) { return state[m.id]; });
+    var base = picked.reduce(function (s, m) { return s + m.alaCarte; }, 0);
+
+    // 分组：套餐促销各占一单；每张券各占一单（真实规则：每单一张券 + 套餐与券互斥）
+    var orders = [];
+    picked.forEach(function (m) {
+      if (m.kind === "promo") {
+        orders.push({
+          title: "单 " + (orders.length + 1) + " · 套餐促销",
+          detail: m.name + "（套餐价，本单不叠券）",
+          price: m.price
+        });
+      } else if (m.kind === "coupon") {
+        orders.push({
+          title: "单 " + (orders.length + 1) + " · 用券",
+          detail: m.name + " · " + m.note,
+          price: m.price
+        });
+      } else {
+        orders.push({ title: "单 " + (orders.length + 1), detail: m.name, price: m.alaCarte });
+      }
+    });
+
+    var total = orders.reduce(function (s, o) { return s + o.price; }, 0);
+    var disc = base - total;
+
+    baseEl.textContent = yuan(base);
+    discEl.textContent = "−" + yuan(disc);
+    totalEl.textContent = yuan(total);
+
+    if (disc > 0.001) {
+      saveBox.hidden = false;
+      saveAmt.textContent = yuan(disc) +
+        (base > 0 ? "（省 " + (disc / base * 100).toFixed(0) + "%）" : "");
+    } else {
+      saveBox.hidden = true;
+    }
+
+    ordersEl.innerHTML = orders.map(function (o) {
+      return '<li><span class="oh"><span>' + o.title + "</span><span>" + yuan(o.price) + "</span></span>" +
+             '<span class="od">' + o.detail + "</span></li>";
+    }).join("");
+
+    var needSplit = orders.length > 1;
+    warnBox.hidden = !needSplit;
+    if (needSplit) {
+      warnBox.innerHTML =
+        "🔀 <b>必须拆成 " + orders.length + " 单下。</b>「套餐」与「券」放同一单会被官方拒绝 " +
+        "<code>600012</code>；每单也只能用一张券 <code>600022</code>。" +
+        "拆单后到手 <b>" + yuan(total) + "</b>。";
+    }
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
