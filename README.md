@@ -94,7 +94,7 @@ flowchart LR
 
 | 能力 | 说明 |
 |---|---|
-| 多池并集比券 | 门店券、我的券、麦麦省券一次性纳入候选 |
+| 多池并集比券 | 门店券、我的券、麦麦省券三池聚合；**真机实测三池返回结构不同**（门店券为结构化 JSON 可核价，我的券/麦麦省券为 Markdown 需解析），按券名去重、标注可领取扩池 |
 | 最优叠加组合 | 满减 / 折扣 / 立减 / 免配送费 自动求最低价 |
 | 类目 & 互斥约束 | 支持类目限定券；订单级券至多一张，贴合真实规则 |
 | 🅱️ **产品级绑定** | 券按 `product_codes` 精确匹配，错配自动失效（券锁定商品也能正确处理）|
@@ -177,6 +177,7 @@ mcd-money-saver/
 ├── src/
 │   ├── coupon_optimizer.py     # 优惠券最优组合优化器（核心 + B/E + rank_candidates）
 │   ├── coupon_adapter.py       # 真实券 JSON -> 领域 Coupon（含 product_codes/expires_at）
+│   ├── coupon_pools.py         # 三池聚合：门店券(JSON) / 我的券 / 麦麦省券(Markdown) 解析
 │   ├── coupon_smart.py         # C 凑单建议 + D 两阶段校验（智能决策增强）
 │   └── mcd_client.py           # 麦当劳 MCP 真实客户端（含 price_combo 官方核价）
 ├── tests/
