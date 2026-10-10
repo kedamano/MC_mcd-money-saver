@@ -24,6 +24,10 @@
   <a href="https://github.com/kedamano/mcd-money-saver">github.com/kedamano/mcd-money-saver</a>  
 </p>
 
+<p align="center">  
+  <a href="https://mcd-money-saver.app.workbuddy.host/"><b>👉 在线体验：勾几样菜，立刻算出今日最省点法</b></a>  
+</p>
+
 ---
 
 ## 🌟 这是什么
