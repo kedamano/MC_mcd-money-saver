@@ -66,9 +66,10 @@ agent_created: true
 > 上述解析与聚合已实现在 `src/coupon_pools.py`（`collect_coupon_pools`），可直接调用。
 
 > 🧾 **券数核对（用户问"为什么 APP 显示 16 张、你只说 15 张"时用）**：
-> `query-my-coupons` 是「**可用**券」视图（原文自述「共 N 张可用优惠券」），已过期 /
-> 未生效 / 不在每日时段窗内的券会被服务端过滤，所以**它和用户 APP 卡包张数天然不等**，
-> 不是账号不一致。直接用 `coupon_pools.audit_my_coupons(client, now="YYYY-MM-DD HH:MM")`
+> `query-my-coupons` 是「**可用**券」视图（原文自述「共 N 张可用优惠券」），服务端会剔掉
+> **已过期/已失效**的券（未生效的未来券仍在列），所以**它和用户 APP 卡包张数天然不等**——
+> 差额通常就是"已过期但仍留在卡包"的那张，**不是账号不一致**。
+> 直接用 `coupon_pools.audit_my_coupons(client, now="YYYY-MM-DD HH:MM")`
 > 一次性拿到「服务端声明数 / 本地解析数 / 当时真正可用数 / 过期·未生效·时段外拆分」，
 > 并把 `mismatch=True` 当作**真问题**（解析或分页遗漏）上报。
 
