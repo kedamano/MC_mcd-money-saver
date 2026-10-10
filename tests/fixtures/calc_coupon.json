@@ -1,0 +1,26 @@
+{
+  "originalPrice": 1900,
+  "discount": 570,
+  "price": 1330,
+  "productList": [
+    {
+      "productCode": "9900000119",
+      "productName": "美式中杯",
+      "quantity": 1,
+      "originalSubtotal": 1900,
+      "subtotal": 1330
+    }
+  ],
+  "takeWayList": [
+    {
+      "code": "eat-in",
+      "title": "堂食",
+      "subtitle": "店内用餐"
+    },
+    {
+      "code": "locker-out",
+      "title": "外带",
+      "subtitle": "店外取餐柜"
+    }
+  ]
+}
