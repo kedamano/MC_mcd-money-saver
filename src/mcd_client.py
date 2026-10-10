@@ -14,8 +14,18 @@ from __future__ import annotations
 
 import json
 import re
+import time
+import urllib.error
 import urllib.request
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
+
+
+class MCPTransientError(RuntimeError):
+    """MCP 瞬时错误（网络抖动 / 5xx / 偶发 404 / 429 限流），可重试。"""
+
+
+class MCPCircuitOpen(RuntimeError):
+    """熔断器打开：连续失败过多，冷却期内直接拒绝，避免雪崩。"""
 
 
 class McDonaldMCPClient:
@@ -33,12 +43,23 @@ class McDonaldMCPClient:
         token: str,
         base_url: str = "https://mcp.mcd.cn/",
         protocol_version: str = "2025-03-26",
+        retries: int = 2,
+        circuit_threshold: int = 3,
+        circuit_cooldown: float = 30.0,
     ) -> None:
         self.token = token
         self.base_url = base_url
         self.protocol_version = protocol_version
         self._session_id: Optional[str] = None
         self._req_id = 0
+        # 健壮性参数（见 C 优化项）
+        self.retries = retries
+        self.circuit_threshold = circuit_threshold
+        self.circuit_cooldown = circuit_cooldown
+        self._fail_count = 0
+        self._circuit_open_until = 0.0
+        # 读接口 TTL 缓存：(name, args_json) -> (expire_at, value)
+        self._cache: Dict[Tuple[str, str], Tuple[float, Any]] = {}
 
     # ----- 请求体构造（可单测）-----
     def build_body(self, method: str, params: Dict[str, Any], req_id: int) -> Dict[str, Any]:
@@ -49,7 +70,11 @@ class McDonaldMCPClient:
         return self._req_id
 
     # ----- 底层 POST -----
-    def _post(self, body: Dict[str, Any]) -> str:
+    # 可重试的瞬时 HTTP 状态（含联调中实测的「偶发 404」与 429 限流）
+    _TRANSIENT_CODES = {404, 408, 425, 429, 500, 502, 503, 504}
+
+    def _post_once(self, body: Dict[str, Any]) -> str:
+        """单次 POST（不含重试），供重试器与测试桩替换。"""
         data = json.dumps(body).encode("utf-8")
         headers = {
             "Content-Type": "application/json",
@@ -66,7 +91,36 @@ class McDonaldMCPClient:
                 return resp.read().decode("utf-8")
         except urllib.error.HTTPError as e:  # 401/403/500 等
             detail = e.read().decode("utf-8", "ignore")[:300]
+            if e.code in self._TRANSIENT_CODES:
+                raise MCPTransientError(f"MCP HTTP {e.code}: {detail}") from e
             raise RuntimeError(f"MCP HTTP {e.code}: {detail}") from e
+
+    def _post(self, body: Dict[str, Any], retry: bool = True) -> str:
+        """带「重试 + 熔断」的 POST。
+
+        - 仅对**瞬时错误**（网络抖动 / 5xx / 偶发 404 / 429）重试，指数退避；
+        - 连续失败达阈值后**熔断**，冷却期内直接拒绝，避免雪崩；
+        - `retry=False` 用于**非幂等/有副作用**的调用（如 create-order 下单），杜绝重试导致重复下单。
+        """
+        if time.time() < self._circuit_open_until:
+            raise MCPCircuitOpen(
+                f"MCP 熔断中，{self._circuit_open_until - time.time():.0f}s 后重试"
+                f"（连续失败 {self._fail_count} 次）"
+            )
+        attempt = 0
+        while True:
+            try:
+                result = self._post_once(body)
+                self._fail_count = 0
+                return result
+            except MCPTransientError as e:
+                if not retry or attempt >= self.retries:
+                    self._fail_count += 1
+                    if self._fail_count >= self.circuit_threshold:
+                        self._circuit_open_until = time.time() + self.circuit_cooldown
+                    raise
+                attempt += 1
+                time.sleep(min(0.5 * (2 ** (attempt - 1)), 4.0))
 
     # ----- 高层调用 -----
     def initialize(self) -> Dict[str, Any]:
@@ -87,15 +141,35 @@ class McDonaldMCPClient:
         envelope = parse_mcp_envelope(self._post(body))
         return envelope.get("result", {}).get("tools", [])
 
-    def call_tool(self, name: str, arguments: Dict[str, Any]) -> Any:
-        """调用工具，返回业务 data（已剥离外层信封与 text 内嵌 JSON，可能是 dict 或 list）。"""
+    def call_tool(self, name: str, arguments: Dict[str, Any], retry: bool = True) -> Any:
+        """调用工具，返回业务 data（已剥离外层信封与 text 内嵌 JSON，可能是 dict 或 list）。
+
+        retry=False 用于有副作用的调用（如 create-order），避免重试导致重复执行。
+        """
         body = self.build_body(
             "tools/call", {"name": name, "arguments": arguments}, req_id=self._next_id()
         )
-        envelope = parse_mcp_envelope(self._post(body))
+        envelope = parse_mcp_envelope(self._post(body, retry=retry))
         return extract_business_data(envelope)
 
-    def call_tool_text(self, name: str, arguments: Dict[str, Any]) -> str:
+    def call_tool_cached(
+        self, name: str, arguments: Dict[str, Any], ttl: float = 300.0
+    ) -> Any:
+        """带 TTL 缓存的读接口调用（C 优化项）。
+
+        门店 / 菜单 / 券在短时间内变化不大，缓存可减少重复 MCP 调用、节省配额并降低限流风险。
+        仅用于**读接口**；勿用于 create-order 等有副作用的调用。
+        """
+        key = (name, json.dumps(arguments, sort_keys=True, ensure_ascii=False))
+        now = time.time()
+        hit = self._cache.get(key)
+        if hit and now < hit[0]:
+            return hit[1]
+        value = self.call_tool(name, arguments)
+        self._cache[key] = (now + ttl, value)
+        return value
+
+    def call_tool_text(self, name: str, arguments: Dict[str, Any], retry: bool = True) -> str:
         """调用工具，返回 content[0].text 原始文本。
 
         真实 observe：并非所有工具都返回结构化 JSON——例如
@@ -105,7 +179,7 @@ class McDonaldMCPClient:
         body = self.build_body(
             "tools/call", {"name": name, "arguments": arguments}, req_id=self._next_id()
         )
-        envelope = parse_mcp_envelope(self._post(body))
+        envelope = parse_mcp_envelope(self._post(body, retry=retry))
         content = envelope.get("result", {}).get("content")
         if not content or not isinstance(content, list):
             raise ValueError(f"{name} 返回缺少 content[0].text")
@@ -219,7 +293,8 @@ class McDonaldMCPClient:
                 arguments["addressId"] = address_id
             if remark:
                 arguments["remark"] = remark
-        return self.call_tool("create-order", arguments)
+        # 下单为非幂等操作，禁用重试，杜绝重复下单
+        return self.call_tool("create-order", arguments, retry=False)
 
     @staticmethod
     def price_combo_as_fn(store_code: str, order_type: int = 1, be_type: int = 1):
