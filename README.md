@@ -4,8 +4,8 @@
 > 一句话自动比券、挑出最优优惠组合、官方核价并下单。
 
 <p align="center">
-  <a href="https://github.com/kedamano/MC_mcd-money-saver/stargazers"><img src="https://img.shields.io/github/stars/kedamano/MC_mcd-money-saver?style=social" alt="GitHub Stars"></a>
-  <a href="https://github.com/kedamano/MC_mcd-money-saver/issues"><img src="https://img.shields.io/github/issues/kedamano/MC_mcd-money-saver" alt="GitHub issues"></a>
+  <a href="https://github.com/kedamano/mcd-money-saver/stargazers"><img src="https://img.shields.io/github/stars/kedamano/mcd-money-saver?style=social" alt="GitHub Stars"></a>
+  <a href="https://github.com/kedamano/mcd-money-saver/issues"><img src="https://img.shields.io/github/issues/kedamano/mcd-money-saver" alt="GitHub issues"></a>
   <img src="https://img.shields.io/badge/license-参赛声明-brightgreen" alt="License">
   <img src="https://img.shields.io/badge/Python-3.11%2B-blue" alt="Python">
   <img src="https://img.shields.io/badge/tests-34%20passed-brightgreen" alt="Tests">
@@ -15,7 +15,7 @@
 
 <p align="center">
   <b>⭐ 如果这个项目帮到了你，点个 Star 支持一下，也帮它冲一波大赛排名！</b><br>
-  <a href="https://github.com/kedamano/MC_mcd-money-saver">github.com/kedamano/MC_mcd-money-saver</a>
+  <a href="https://github.com/kedamano/mcd-money-saver">github.com/kedamano/mcd-money-saver</a>
 </p>
 
 ---
@@ -197,5 +197,5 @@ mcd-money-saver/
 ---
 
 <p align="center">
-  <b>🍔 觉得有用？<a href="https://github.com/kedamano/MC_mcd-money-saver">点个 Star</a> 支持作者冲大赛排名！</b>
+  <b>🍔 觉得有用？<a href="https://github.com/kedamano/mcd-money-saver">点个 Star</a> 支持作者冲大赛排名！</b>
 </p>
