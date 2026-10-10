@@ -87,13 +87,29 @@ class McDonaldMCPClient:
         envelope = parse_mcp_envelope(self._post(body))
         return envelope.get("result", {}).get("tools", [])
 
-    def call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-        """调用工具，返回业务 data 字典（已剥离外层信封与 text 内嵌 JSON）。"""
+    def call_tool(self, name: str, arguments: Dict[str, Any]) -> Any:
+        """调用工具，返回业务 data（已剥离外层信封与 text 内嵌 JSON，可能是 dict 或 list）。"""
         body = self.build_body(
             "tools/call", {"name": name, "arguments": arguments}, req_id=self._next_id()
         )
         envelope = parse_mcp_envelope(self._post(body))
         return extract_business_data(envelope)
+
+    def call_tool_text(self, name: str, arguments: Dict[str, Any]) -> str:
+        """调用工具，返回 content[0].text 原始文本。
+
+        真实 observe：并非所有工具都返回结构化 JSON——例如
+        `query-my-coupons` / `available-coupons` 返回的是 **Markdown 文本**，
+        没有 {success,...} 信封，须用本方法取原文后再做文本解析（见 coupon_pools）。
+        """
+        body = self.build_body(
+            "tools/call", {"name": name, "arguments": arguments}, req_id=self._next_id()
+        )
+        envelope = parse_mcp_envelope(self._post(body))
+        content = envelope.get("result", {}).get("content")
+        if not content or not isinstance(content, list):
+            raise ValueError(f"{name} 返回缺少 content[0].text")
+        return content[0].get("text", "")
 
     # ----- 省钱核心：官方核价（D 两阶段校验的真实实现）-----
     def price_combo(
