@@ -14,7 +14,8 @@
 
 | Tool | 调用时机 | 业务作用 |
 |---|---|---|
-| `query-nearby-stores` / `delivery-query-stores` | 流程开始 | 确定下单门店（到店/外送） |
+| `query-nearby-stores` / `delivery-query-stores` | 流程开始 | 确定下单门店（到店/外送）；外送须先建地址，再取门店 `beCode` |
+| `delivery-create-address` / `delivery-query-addresses` | 外送前置 | 创建/查询配送地址，为外送门店查询提供 `addressId` |
 | `query-meals` | 选品阶段 | 拉取门店菜单，构造购物项列表（含价格、类目） |
 | `query-meal-detail` | 套餐场景 | 查看套餐组成，辅助搭配 |
 | `query-store-coupons` | 优惠收集 | 获取当前门店可用优惠券（候选券池 ①） |
@@ -79,6 +80,8 @@
 4. **算价商品字段**：`calculate-price` 的 `items[]` 用 **`productCode`**（与菜单 `code` 一致），不是 `code`；金额以**分**为单位返回。
 5. **券可直传算价**：`items[]` 支持直接带 `couponCode` + `couponId`，优惠券会在 `discount` 字段正确体现——这正是本助手"最优组合核价"的实现基础。
 6. **券商品需带券**：以 `990000` 开头的券商品（如 9900000119 美式中杯）基础算价返回空，必须配合对应券；常规售卖商品（如 520689 鲜萃咖啡）可直接基础算价。
+7. **外送全程必传 `beCode`**：外送(beType=2)下 `query-meals` / `query-store-coupons` / `calculate-price` 缺 `beCode` 报 `code=600048`；`beCode` 来自 `delivery-query-stores`（须先 `delivery-create-address` 建地址）。外送商品 `code` 与到店不通用（到店下单报 `60006 不可售`）。
+8. **券有渠道限制**：到店专用券用于外送核价返回 `code=600012「当前优惠券不可用！」`，到店则正常生效。外送价额外含 `deliveryPrice`（配送费）与 `packingPrice`（打包服务费），且折扣可能来自商品自身促销价而非券。
 
 ### 6.3 实测核价样例
 
@@ -86,3 +89,16 @@
 - 小杯鲜萃咖啡 `520689` 基础算价 → 原价 ¥9.50 / 优惠 ¥0.00 / **现价 ¥9.50**
 
 > 结论：优惠券在 `calculate-price` 中可正确生效，本项目的"三池比券 + 最优组合 + 官方核价"省钱闭环在真实 MCP 上成立。
+
+### 6.4 外送（麦乐送）链路验证
+
+| 环节 | Tool | 真实结果 |
+|---|---|---|
+| 建地址 | `delivery-create-address` | 上海测试地址 → 返回 `addressId` |
+| 外送门店 | `delivery-query-stores`(beType=2) | `storeCode=1450056 / beCode=145005602`（上海食品一店） |
+| 外送菜单 | `query-meals`(orderType=2, beCode) | 外送专属菜单 121 项（商品 code 与到店不同） |
+| 外送核价 | `calculate-price`(orderType=2, beCode) | 汉堡包×2+奶铁+脆薯饼 → 原价 ¥69.50 / 优惠 ¥7.10 / **到手 ¥62.40**（商品 ¥53.40 + **配送费 ¥6.00** + **打包费 ¥3.00**） |
+| 券渠道 | 同一张「到店专用」券 | 到店：19.00→**13.30** 生效；外送：`code=600012 当前优惠券不可用！` |
+
+> 结论：外送链路（含配送费/打包费）与「券有渠道限制」均已在真实 MCP 上验证；本项目的
+> 「到店/外送双场景 + 拆分下单」在真实规则下成立。
