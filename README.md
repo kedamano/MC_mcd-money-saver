@@ -13,7 +13,7 @@
   <a href="https://github.com/kedamano/mcd-money-saver/issues"><img src="https://img.shields.io/github/issues/kedamano/mcd-money-saver" alt="GitHub issues"></a>  
   <img src="https://img.shields.io/badge/license-参赛声明-brightgreen" alt="License">  
   <img src="https://img.shields.io/badge/Python-3.11%2B-blue" alt="Python">  
-  <img src="https://img.shields.io/badge/tests-168%20passed-brightgreen" alt="Tests">  
+  <img src="https://img.shields.io/badge/tests-175%20passed-brightgreen" alt="Tests">  
   <img src="https://img.shields.io/badge/MCP-35%20tools%20live-orange" alt="MCP">  
   <img src="https://img.shields.io/badge/Contest-麦当劳MCP大赛-ffc72c" alt="Contest">  
 </p>
