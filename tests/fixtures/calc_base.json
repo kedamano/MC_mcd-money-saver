@@ -1,0 +1,26 @@
+{
+  "originalPrice": 950,
+  "discount": 0,
+  "price": 950,
+  "productList": [
+    {
+      "productCode": "520689",
+      "productName": "小杯鲜萃咖啡",
+      "quantity": 1,
+      "originalSubtotal": 950,
+      "subtotal": 950
+    }
+  ],
+  "takeWayList": [
+    {
+      "code": "eat-in",
+      "title": "堂食",
+      "subtitle": "店内用餐"
+    },
+    {
+      "code": "locker-out",
+      "title": "外带",
+      "subtitle": "店外取餐柜"
+    }
+  ]
+}
