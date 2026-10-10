@@ -81,10 +81,13 @@
 | 套餐优化单测 | `tests/test_combo_optimizer.py` | `parse_meal_detail`/`combo_saving`（真实节省下界）/`optimize_purchase`（与暴力子集基准同解 30 组随机）/`plan_order_with_combos`（套餐 vs 券二选一）|
 | 多店比价单测 | `tests/test_store_optimizer.py` | `optimize_across_stores`（同品不同价、距离过滤、权衡量化、缺货跳过）、门店券标题解析、采集器 |
 | 促销范围合同 | `tests/test_promotions_scope.py` | 真实结论：`query-promotions` 的 `beTypes` 恒为 `["6"]`（企业团餐）；外送缺 `beCode` 报 `600048` |
+| 券渠道合同 | `tests/test_coupon_channel.py` | `infer_channel_from_tag`（到店/外送标签推断）、`filter_coupons_by_channel`、`optimize_coupons`/`rank_candidates`/`optimize_split_orders` 的 `order_channel` 前置过滤；我的券解析带 `channel` |
+| 核价拒绝合同 | `tests/test_pricing_rejection.py` | `raise_if_business_error` 区分 `CouponRejectedError`（券被拒）与 `MCPBusinessError`；两阶段校验中**被拒候选不得胜出**、全部被拒退化为不用券、网络异常仍降级 |
+| 凑单加量合同 | `tests/test_addon_optimize.py` | `suggest_threshold_addons(allow_existing=True)` 支持对已点商品加量并标注 `is_existing`；`optimize_with_addons` 与「不凑单最优」同口径比较，净亏不推 |
 
 运行：
 ```bash
-python -m pytest tests/ -q                 # 离线：137 例全过
+python -m pytest tests/ -q                 # 离线：163 例全过
 MCD_MCP_TOKEN=xxx pytest -m live -q        # 真实端到端（可选，4 例 live）
 python examples/demo_smart.py              # B/C/D/E 离线演示
 MCD_MCP_TOKEN=xxx python examples/demo_live.py           # 真实端到端演示（选店→三池→官方核价）
@@ -115,9 +118,15 @@ MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 真实官方核价�
 | **F4** | 套餐纳入优化：套餐 vs 单点求全局最低价，套餐与券二选一（真实最多省 ¥18.00） | `combo_optimizer.optimize_purchase` / `plan_order_with_combos` / `rank_combo_deals` | ✅ |
 | **F5** | 多店比价 + 距离权衡：可接受距离内比较到手价，量化「多走几米省几元」 | `store_optimizer.optimize_across_stores` / `collect_store_quotes` | ✅ |
 | **F6** | 促销范围核实：实测 `query-promotions` 仅企业团餐（`beTypes=["6"]`），诚实排除而非虚假承诺 | `tests/test_promotions_scope.py` | ✅ |
+| **F7** | 券渠道建模 + 本地前置过滤：`Coupon.channel`（到店/外送）由券标签推断，`filter_coupons_by_channel` 在**求解前**排除渠道不符券（不靠官方 `600012` 事后兜底） | `coupon_optimizer.Coupon.channel` / `infer_channel_from_tag` / `filter_coupons_by_channel` / `coupon_pools.parse_my_coupons_text` | ✅ |
+| **F8** | 核价失败语义区分：`CouponRejectedError`（业务拒绝：渠道不符/多券叠加）**剔除候选**，与网络异常（降级本地估计）严格分离，杜绝「被拒方案因估计更便宜而胜出」 | `errors.raise_if_business_error` / `mcd_client.price_combo` / `coupon_smart.two_stage_optimize` | ✅ |
+| **F9** | 凑单加量 + 纳入主流程：`suggest_threshold_addons(allow_existing=True)` 允许对已点商品加量（标注 `is_existing`）；`optimize_with_addons` 与「不凑单最优」同口径比较，只有真实更省才推荐 | `coupon_smart.suggest_threshold_addons` / `optimize_with_addons` / `_build_addon_items` | ✅ |
 
 > **关键 Bug 修复（真机联调发现，均补了回归测试）**：
 > 1. `calculate-price` 返回 `{success,code,message,data:{...}}`，需拆到最内层 `data`，否则取到 `price=None` 核价归零；
 > 2. `query-nearby-stores` / `query-store-coupons` 的 `data` 是**列表**，原实现只拆 dict，导致门店/券数为 0；
 > 3. `query-meals` 的说明文字含 `{code}` 占位符，按「第一个 `{`」解析会 `JSONDecodeError`，改为锚定 `{"success"`。
 > 4. 分支限界实现中发现**免配送费券被重复减免**：带显式 `stack_group` 的 free_delivery 券会绕过 `__free_delivery__` 合成互斥组，导致两券各减一次配送费。已统一为「免配送费最多减免一次」（与暴力枚举语义一致），并以 40 组随机用例锁定同解性。
+> 5. **核价错误响应被当成 ¥0**：券被拒时 `calculate-price` 返回 `{success:false, code:600012, message:...}` 且**无 `price` 字段**，而 `price_combo_as_fn` 用 `data.get("price") or 0` 取值 → 返回 **¥0**，导致**被官方拒绝的方案反而"最便宜"而必然胜出**；`two_stage_optimize` 又对所有异常一律降级，进一步放大该问题。已改为 `errors.raise_if_business_error` 抛出 `CouponRejectedError`，两阶段校验将其**剔除**而非降级（网络异常仍降级）。真机验证：无效券码现返回 `CouponRejectedError 600012`，不再返回 ¥0。
+> 6. **券渠道约束只靠官方兜底**：「到店专用」券曾被带入外送方案，仅靠官方 `600012` 事后拦截，而该拦截又会被上面的降级逻辑吃掉。已在 `Coupon` 上建 `channel` 属性并在**本地求解前**过滤（`filter_coupons_by_channel`），渠道信息从「我的券」标签（`parse_my_coupons_text`）与门店券查询入口（`coupon_from_store_json(channel=...)`）获取。
+> 7. **凑单无法对已点商品加量**：旧 `suggest_threshold_addons` 无条件排除车内商品，导致最常见的「再点一份同款跨门槛」被系统性漏掉；且该函数从未被主流程调用。已加 `allow_existing` 并新增 `optimize_with_addons` 纳入主流程。
