@@ -38,13 +38,21 @@ def infer_channel_from_tag(tag: Optional[str]) -> Optional[str]:
 
     真实 observe：`query-my-coupons` 的标签字段形如「到店专用」；此类券用于外送
     核价会被官方拒绝（`code=600012「当前优惠券不可用！」`）。
+
+    双渠道标签（真实 observe：「到店专用、外送专用」，如 9.9元中杯冰美式）语义上是
+    **两个渠道都能用**，等价于「不限渠道」，因此返回 None。若只按关键词顺序先命中
+    「外送」就返回 delivery，会把这张券错误地排除在到店候选之外。
     """
     t = (tag or "").strip()
     if not t:
         return None
-    if any(k in t for k in _CH_DELIVERY_KEYWORDS):
+    has_delivery = any(k in t for k in _CH_DELIVERY_KEYWORDS)
+    has_dine_in = any(k in t for k in _CH_DINE_IN_KEYWORDS)
+    if has_delivery and has_dine_in:
+        return None  # 双渠道通用券 = 不限渠道
+    if has_delivery:
         return CHANNEL_DELIVERY
-    if any(k in t for k in _CH_DINE_IN_KEYWORDS):
+    if has_dine_in:
         return CHANNEL_DINE_IN
     return None
 
