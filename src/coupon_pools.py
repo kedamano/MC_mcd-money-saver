@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
-from src.coupon_optimizer import infer_channel_from_tag
+from src.coupon_optimizer import infer_channel_from_tag, _within_any_window
 
 # ---- 我的券（query-my-coupons）Markdown 解析 ----
 _RE_MY_PRICE = re.compile(r"\*\*优惠\*\*:\s*(.+)")
@@ -37,6 +37,8 @@ _RE_IMG = re.compile(r'<img src="([^"]+)"')
 _RE_CID_IN_IMG = re.compile(r"/([0-9A-Fa-f]{32})\.png")
 _RE_DATE = re.compile(r"(\d{4}-\d{2}-\d{2})")
 _RE_TIME_WINDOW = re.compile(r"(\d{1,2}:\d{2})-(\d{1,2}:\d{2})")
+# 服务端自述总数：「共 15 张可用优惠券 | 第 1/1 页 | 每页 200 条」
+_RE_DECLARED_TOTAL = re.compile(r"共\s*(\d+)\s*张")
 
 
 def parse_valid_period(text: str):
@@ -100,6 +102,82 @@ def parse_my_coupons_text(text: str) -> List[Dict[str, Any]]:
             }
         )
     return out
+
+
+# ---- 券数核对（MCP 声明总数 vs 本地解析数 vs 当前可用数）----
+def parse_declared_total(text: str) -> Optional[int]:
+    """从 `query-my-coupons` 原文解析服务端**自述总数**。
+
+    真实原文首部形如：`共 15 张可用优惠券 | 第 1/1 页 | 每页 200 条`。
+    取「共 N 张」用于与本地解析条数对账，识别解析遗漏或分页遗漏。
+    """
+    m = _RE_DECLARED_TOTAL.search(text or "")
+    return int(m.group(1)) if m else None
+
+
+def audit_my_coupon_items(
+    items: List[Dict[str, Any]],
+    declared: Optional[int] = None,
+    now: Optional[str] = None,
+) -> Dict[str, Any]:
+    """按「是否当前可用」对券做分类计数，给出可复现的核对口径。
+
+    now: "YYYY-MM-DD HH:MM"（北京时间）。缺省不过滤，全部计为可用。
+
+    分类优先级（互斥，先命中先归类）：
+        过期(expired) > 未生效(not_effective) > 时段不符(outside_window) > 可用(usable_now)
+
+    为什么需要它：MCP `query-my-coupons` 是「**可用**券」视图，已过期 / 未生效 /
+    时段外（如早餐券仅在 05:00-10:29）的券会被过滤；而用户 APP 卡包显示的是原始
+    领取数，两者天然不等。核对结果中的 `mismatch` 用于暴露「解析遗漏」这类真问题。
+    """
+    now_date: Optional[str] = None
+    now_time: Optional[str] = None
+    if now:
+        parts = now.strip().split()
+        now_date = parts[0] if parts else None
+        now_time = parts[1] if len(parts) > 1 else None
+
+    expired = not_effective = outside_window = usable = 0
+    for it in items:
+        vf = it.get("valid_from")
+        ex = it.get("expires_at")
+        wins = it.get("time_windows") or []
+        if now_date:
+            if ex and ex < now_date:
+                expired += 1
+                continue
+            if vf and vf > now_date:
+                not_effective += 1
+                continue
+            if wins and now_time and not _within_any_window(now_time, wins):
+                outside_window += 1
+                continue
+        usable += 1
+
+    return {
+        "declared": declared,
+        "parsed": len(items),
+        "usable_now": usable,
+        "expired": expired,
+        "not_effective": not_effective,
+        "outside_window": outside_window,
+        "mismatch": declared is not None and declared != len(items),
+    }
+
+
+def audit_my_coupons(client, now: Optional[str] = None) -> Dict[str, Any]:
+    """真实拉取我的券并做核对，返回 {audit, items}。
+
+    用于回答用户「为什么 MCP 张数和 APP 卡包对不上」这类问题：输出服务端声明数、
+    本地解析数、按有效期/时段拆分后的可用数，以及是否存在解析遗漏（mismatch）。
+    """
+    text = client.call_tool_text("query-my-coupons", {})
+    items = parse_my_coupons_text(text)
+    return {
+        "audit": audit_my_coupon_items(items, declared=parse_declared_total(text), now=now),
+        "items": items,
+    }
 
 
 # ---- 麦麦省券（available-coupons）Markdown 解析 ----
