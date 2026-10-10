@@ -76,11 +76,21 @@ agent_created: true
 > ⚠️ **券有渠道限制**：标注「到店专用」的券**不能用于外送**——外送核价会返回
 > `code=600012「当前优惠券不可用！」`（同一张券到店则正常生效）。选券时必须按当前
 > `orderType` 过滤，避免报出"算得省、下单废"的假方案。
+>
+> ✅ **现已内建渠道过滤**：券可带 `channel`（`CHANNEL_DINE_IN` / `CHANNEL_DELIVERY`），
+> 由「我的券」标签（如「到店专用」）自动推断。跑优化器时传 `order_channel="delivery"`
+> （或 `"dine_in"`），`filter_coupons_by_channel` 会在**本地求解前**剔除渠道不符的券，
+> 结果里用 `channel_excluded` 回报被排除的券——不再依赖官方报错兜底。
 
 ### 4. 跑优化器，挑最优组合
 > ⏱️ **先按时间有效性过滤**：用 `now-time-info` 拿到当前时间，调用
 > `filter_active_coupons(coupons, now="YYYY-MM-DD HH:MM")` 剔除「已过期 / 未生效 /
 > 不在每日时段窗（如仅 05:00-23:59 可用）」的券，再送优化器，避免算出用不了的券。
+
+> 🚫 **核价失败的两种语义要分清**：券被官方**业务拒绝**（渠道不符 `600012`、多券叠加
+> `600022`）会抛 `CouponRejectedError`，该候选**必须剔除**；只有网络抖动才可降级为本地
+> 估计。`two_stage_optimize` 已内建该区分，并通过 `rejected` / `errored` / `all_rejected`
+> 回报。切勿把被拒方案当成"更便宜"而报给用户。
 
 将 `Item` 列表、`Coupon` 列表与 `delivery_fee` 写入临时输入，运行：
 
@@ -91,6 +101,11 @@ python src/coupon_optimizer.py            # 内置演示
 
 优化器会暴力枚举所有券组合，在满足「门槛校验 + 订单级券至多一张 + 免配送费券互斥」
 约束下输出最低总价、选用券与节省金额。
+
+> 🧮 **差一点到门槛时用凑单**：`optimize_with_addons(items, coupons, catalog)`
+> 会对未达门槛的满减券反推「最小代价加购组合」，并与「不凑单最优」**同口径**比较总价，
+> 只有真实更省才推荐（`used_addons` / `add_items` / `saved`）。其中**允许对已点商品加量**
+> （`allow_existing=True`）——「再点一份同款薯条」往往就是最便宜的跨门槛路径。
 
 **自定义调用片段**（由 WorkBuddy 在运行时生成并写入临时文件执行）：
 
