@@ -23,6 +23,60 @@ import heapq
 from typing import List, Optional, Tuple
 
 
+# ---------------------------------------------------------------------------
+# 券的适用渠道（真实 observe：我的券「标签」字段会标注「到店专用」等）
+# ---------------------------------------------------------------------------
+CHANNEL_DINE_IN = "dine_in"      # 到店（堂食/外带/取餐柜）
+CHANNEL_DELIVERY = "delivery"    # 外送（麦乐送）
+
+_CH_DELIVERY_KEYWORDS = ("外送", "麦乐送", "配送")
+_CH_DINE_IN_KEYWORDS = ("到店", "堂食", "店内", "餐厅")
+
+
+def infer_channel_from_tag(tag: Optional[str]) -> Optional[str]:
+    """从券的「标签/描述」文本推断适用渠道；无法判定返回 None（= 不限渠道）。
+
+    真实 observe：`query-my-coupons` 的标签字段形如「到店专用」；此类券用于外送
+    核价会被官方拒绝（`code=600012「当前优惠券不可用！」`）。
+    """
+    t = (tag or "").strip()
+    if not t:
+        return None
+    if any(k in t for k in _CH_DELIVERY_KEYWORDS):
+        return CHANNEL_DELIVERY
+    if any(k in t for k in _CH_DINE_IN_KEYWORDS):
+        return CHANNEL_DINE_IN
+    return None
+
+
+def _channel_ok(coupon: "Coupon", order_channel: Optional[str]) -> bool:
+    """券是否适用于该下单渠道（券未标注渠道、或未指定渠道时一律放行）。"""
+    if order_channel is None or coupon.channel is None:
+        return True
+    return coupon.channel == order_channel
+
+
+def filter_coupons_by_channel(
+    coupons: List["Coupon"], order_channel: Optional[str] = None
+) -> dict:
+    """按下单渠道过滤券，返回 {valid, excluded, warnings}。
+
+    把「渠道约束」从「依赖官方核价报错兜底」前移到**本地求解之前**——避免把
+    到店专用券带进外送方案（官方必然返回 `code=600012`），也避免无效候选耗费核价次数。
+    """
+    valid: List["Coupon"] = []
+    excluded: List["Coupon"] = []
+    warnings: List[str] = []
+    for c in coupons:
+        if _channel_ok(c, order_channel):
+            valid.append(c)
+        else:
+            excluded.append(c)
+            label = "到店" if c.channel == CHANNEL_DINE_IN else "外送"
+            warnings.append(f"券 {c.id} 仅限{label}使用，已按当前渠道排除")
+    return {"valid": valid, "excluded": excluded, "warnings": warnings}
+
+
 @dataclass
 class Item:
     """购物项。
@@ -54,6 +108,9 @@ class Coupon:
     expires_at:   失效日期（YYYY-MM-DD）；非空且早于 now 视为过期（见 E 优化项）
     valid_from:   生效日期（YYYY-MM-DD）；非空且晚于 now 视为"未到生效时间"（见 B 优化项）
     time_windows: 每日可用时段，元素为 ("HH:MM","HH:MM")；非空且当前时刻不在任一区间内视为时段不符
+    channel:      适用渠道；CHANNEL_DINE_IN / CHANNEL_DELIVERY / None(=不限)。
+                  真实 observe：「到店专用」券在外送核价被拒（code=600012），
+                  故须在本地求解前按渠道过滤（见 filter_coupons_by_channel）。
     """
 
     id: str
@@ -67,6 +124,7 @@ class Coupon:
     expires_at: Optional[str] = None
     valid_from: Optional[str] = None
     time_windows: List[Tuple[str, str]] = field(default_factory=list)
+    channel: Optional[str] = None      # 适用渠道（None = 不限）
     coupon_code: Optional[str] = None  # 真实券码（calculate-price 传参用）
     coupon_id: Optional[str] = None    # 真实券 ID（calculate-price 传参用）
 
@@ -307,6 +365,7 @@ def optimize_coupons(
     strategy: str = "auto",
     brute_force_limit: int = 16,
     max_coupons_per_order: Optional[int] = None,
+    order_channel: Optional[str] = None,
 ) -> dict:
     """求最低总价方案（支持暴力枚举 / 分支限界两种策略）。
 
@@ -320,6 +379,9 @@ def optimize_coupons(
       每单仅支持一张券（传两张返回 code=600022「暂不支持多张券使用」），
       故真实核价路径应传 1；缺省 None 表示不限制（保留通用组合能力）。
 
+    order_channel: 下单渠道（CHANNEL_DINE_IN / CHANNEL_DELIVERY / None）。
+      传入后**先按渠道过滤券**，返回 `channel_excluded` 列出被排除的券 id。
+
     返回结构：
     {
         "original_total": float,        # 未用券总价
@@ -327,8 +389,12 @@ def optimize_coupons(
         "best_coupons": List[str],      # 选用券 id（保持输入顺序）
         "saved": float,                 # 节省金额
         "breakdown": List[dict],        # 每张选用券的优惠明细
+        "channel_excluded": List[str],  # 因渠道不符被排除的券 id
+        "channel_warnings": List[str],
     }
     """
+    channel_result = filter_coupons_by_channel(coupons, order_channel)
+    coupons = channel_result["valid"]
     original_total = total_price(items, delivery_fee)
     n = len(coupons)
     use_bnb = strategy == "bnb" or (strategy == "auto" and n > brute_force_limit)
@@ -379,6 +445,8 @@ def optimize_coupons(
         "best_coupons": [c.id for c in ordered_subset],
         "saved": round(original_total - best_total, 2),
         "breakdown": breakdown,
+        "channel_excluded": [c.id for c in channel_result["excluded"]],
+        "channel_warnings": list(channel_result["warnings"]),
     }
 
 
@@ -614,6 +682,7 @@ def rank_candidates(
     strategy: str = "auto",
     brute_force_limit: int = 16,
     max_coupons_per_order: Optional[int] = None,
+    order_channel: Optional[str] = None,
 ) -> List[dict]:
     """返回本地估计节省额最高的 Top-K 券组合候选。
 
@@ -629,8 +698,11 @@ def rank_candidates(
     max_coupons_per_order: 每单可同时使用的最大券数（真实 MCP 为 1，见
       optimize_coupons 说明）；缺省 None 表示不限制。
 
+    order_channel: 下单渠道；传入后候选**不含**渠道不符的券（不会白耗核价次数）。
+
     返回每个候选含 best_coupon_objs（Coupon 对象列表），供核价回调使用。
     """
+    coupons = filter_coupons_by_channel(coupons, order_channel)["valid"]
     use_bnb = strategy == "bnb" or (strategy == "auto" and len(coupons) > brute_force_limit)
     if use_bnb:
         return _rank_candidates_bnb(items, coupons, delivery_fee, top_k, max_coupons_per_order)
@@ -727,6 +799,7 @@ def optimize_split_orders(
     max_orders: int = 3,
     max_coupons_per_order: Optional[int] = 1,
     strategy: str = "auto",
+    order_channel: Optional[str] = None,
 ) -> dict:
     """把购物车拆成多单、每单配一张最优券，求全局最低总价。
 
@@ -755,6 +828,8 @@ def optimize_split_orders(
         }
     """
     original_total = total_price(items, delivery_fee)
+    channel_result = filter_coupons_by_channel(coupons, order_channel)
+    coupons = channel_result["valid"]
     # 0 优惠券对任何划分都无贡献，安全剪枝（与 optimize_coupons 一致）
     usable = _prune_zero_value(coupons, items, delivery_fee)
     coupon_by_id = {c.id: c for c in coupons}
@@ -806,6 +881,8 @@ def optimize_split_orders(
         "split": len(best_blocks) > 1,
         "orders": orders,
         "strategy_used": "exact" if can_split else "single",
+        "channel_excluded": [c.id for c in channel_result["excluded"]],
+        "channel_warnings": list(channel_result["warnings"]),
     }
 
 
