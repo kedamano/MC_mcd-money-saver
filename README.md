@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/assets/hero.png" alt="麦麦省钱助手 · 基于麦当劳中国 MCP 的最优省钱点单 Skill" width="100%">
+</p>
+
 # 🍔 麦麦省钱助手（McDonald's Money-Saver）
 
 > **麦当劳程序员创意开发大赛参赛作品** · 基于麦当劳中国 MCP 的省钱点餐 Skill
@@ -34,6 +38,12 @@
 ## 📊 真实数据说话（不是 Demo，是真连）
 
 本项目**真实接入麦当劳 MCP**，跨多城门店跑通端到端链路（2026-10-10 实测）：
+
+<p align="center">
+  <img src="docs/assets/pipeline-live.gif" alt="真实链路终端实录：时间 → 门店 → 菜单 → 三池券 → 官方核价" width="94%">
+</p>
+
+<p align="center"><sub>▲ 真实运行 <code>examples/demo_live.py</code> 的终端实录（2026-10-10 14:22 · 上海悦荟广场店 · 真实 MCP 网关，非录制脚本）</sub></p>
 
 | 环节 | 工具 | 真实结果 |
 |---|---|---|
@@ -90,6 +100,13 @@
 
 ## 🏗️ 端到端架构
 
+<p align="center">
+  <img src="docs/assets/architecture.png" alt="端到端架构图：用户 → WorkBuddy Skill → 纯标准库 MCP 客户端 → 麦当劳 MCP 网关（35 tools）→ 官方核价/下单" width="100%">
+</p>
+
+<details>
+<summary>文本版流程图（Mermaid，可编辑）</summary>
+
 ```mermaid
 flowchart LR
     U["💬 用户一句话<br/>『帮我点麦当劳怎么最省』"] --> S["🤖 WorkBuddy<br/>麦麦省钱助手 Skill"]
@@ -105,6 +122,8 @@ flowchart LR
     style V fill:#43a047,stroke:#1b5e20,color:#fff
     style D fill:#fb8c00,stroke:#e65100,color:#fff
 ```
+
+</details>
 
 ### 🔍 两阶段核价模型（为什么结果可信）
 
@@ -232,7 +251,9 @@ mcd-money-saver/
 │   └── demo_live.py            # ⭐ 真实 MCP 端到端演示（选店→拉券→官方核价）
 ├── .github/workflows/ci.yml    # GitHub Actions：每次 push 自动跑离线测试
 ├── scripts/
-│   └── doctor.py               # 环境自检：排查 mcp.json type / Token 前缀 / 握手
+│   ├── doctor.py               # 环境自检：排查 mcp.json type / Token 前缀 / 握手
+│   └── build_assets.py         # 生成本 README 视觉素材（hero / 架构图 / 终端实录，可复现）
+├── docs/assets/                # README 视觉素材：hero.png · architecture.png · pipeline-live.gif
 ├── conftest.py / pytest.ini    # pytest 路径与标记配置
 └── references/
     └── mcp_tools.md            # 省钱场景 MCP 工具参考
