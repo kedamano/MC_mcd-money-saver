@@ -189,8 +189,8 @@ def parse_mcp_envelope(raw: str) -> Dict[str, Any]:
     return json.loads(raw)  # 兜底
 
 
-def extract_business_data(envelope: Dict[str, Any]) -> Dict[str, Any]:
-    """从 tools/call 信封中取出业务 JSON。
+def extract_business_data(envelope: Dict[str, Any]) -> Any:
+    """从 tools/call 信封中取出业务 JSON（可能是 dict 或 list）。
 
     真实 observe：result.content[0].text 是一段「说明文字 + 业务 JSON + 说明文字」，
     需用 raw_decode 从第一个 '{' 精确解析，不能直接 json.loads 整段。
@@ -205,12 +205,35 @@ def extract_business_data(envelope: Dict[str, Any]) -> Dict[str, Any]:
     if not text:
         raise ValueError("content[0].text 为空")
     decoder = json.JSONDecoder()
-    idx = text.find("{")
-    if idx < 0:
-        raise ValueError("text 中未找到业务 JSON")
-    data, _ = decoder.raw_decode(text, idx)
-    # 真实 observe：外层为 {success, code, message, data:{...实际业务...}}
-    # 若解析结果内嵌 data 字典，则进一步拆到业务层
-    if isinstance(data.get("data"), dict):
+    # 真实 observe：text = 「人读说明 + 业务 JSON + 尾部说明」。
+    # 说明文字里可能含有 `{code}` 这类占位符（如 query-meals 的字段表），
+    # 直接取「第一个 {」会解析到占位符而抛 JSONDecodeError。
+    # 业务 JSON 固定以 `{"success"` 开头，优先据此精确定位；否则回退逐个 { 试解。
+    idx = text.find('{"success"')
+    if idx >= 0:
+        data, _ = decoder.raw_decode(text, idx)
+    else:
+        data = None
+        pos = 0
+        while True:
+            i = text.find("{", pos)
+            if i < 0:
+                break
+            try:
+                data, _ = decoder.raw_decode(text, i)
+                break
+            except json.JSONDecodeError:
+                pos = i + 1
+        if data is None:
+            raise ValueError("text 中未找到业务 JSON")
+    # 真实 observe：外层为网关信封 {success, code, message, data:{...}} 
+    # 业务 data 既可能是 dict（如 now-time-info / query-meals），
+    # 也可能是 **list**（如 query-nearby-stores / query-store-coupons）。
+    # 只要是「网关信封形态」(含 success/code/message) 且 data 为 dict/list，就拆到业务层。
+    if (
+        isinstance(data, dict)
+        and ("success" in data or "code" in data or "message" in data)
+        and isinstance(data.get("data"), (dict, list))
+    ):
         return data["data"]
     return data
