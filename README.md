@@ -5,10 +5,11 @@
 
 <p align="center">
   <a href="https://github.com/kedamano/mcd-money-saver/stargazers"><img src="https://img.shields.io/github/stars/kedamano/mcd-money-saver?style=social" alt="GitHub Stars"></a>
+  <a href="https://github.com/kedamano/mcd-money-saver/actions/workflows/ci.yml"><img src="https://github.com/kedamano/mcd-money-saver/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/kedamano/mcd-money-saver/issues"><img src="https://img.shields.io/github/issues/kedamano/mcd-money-saver" alt="GitHub issues"></a>
   <img src="https://img.shields.io/badge/license-参赛声明-brightgreen" alt="License">
   <img src="https://img.shields.io/badge/Python-3.11%2B-blue" alt="Python">
-  <img src="https://img.shields.io/badge/tests-34%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-36%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/MCP-35%20tools%20live-orange" alt="MCP">
   <img src="https://img.shields.io/badge/Contest-麦当劳MCP大赛-ffc72c" alt="Contest">
 </p>
@@ -51,7 +52,10 @@
 > 美式中杯 ¥19.00 × 0.7 = ¥13.30，与券面"7 折"**完全吻合**，`discount=570` 分，服务端权威价与本地计算一致。
 > 更妙的是：美式中杯是**券锁定商品**——没券时 `calculate-price` 会直接把它踢出订单。这正是本 Skill 用 `product_codes` 做"券↔商品"精确绑定的现实依据。
 
-**自动化验证**：`pytest` 回归 **34 passed（离线 33 + 真实 live 冒烟 1）**，其中 `test_live_end_to_end` 走项目自带 Python 客户端（`mcd_client.py`，纯标准库）真实连通 `initialize → list_tools(35) → now-time-info`。
+**自动化验证**：`pytest` 回归 **36 passed（离线 35 + 真实 live 冒烟 1）**，其中 `test_live_end_to_end` 走项目自带 Python 客户端（`mcd_client.py`，纯标准库）真实连通 `initialize → list_tools(35) → now-time-info`。
+
+> 🎬 **想看完整真实链路？** 运行 `MCD_MCP_TOKEN=xxx python examples/demo_live.py`，
+> 一条命令跑通「时间 → 门店 → 菜单 → 优惠券 → 官方核价」，样例输出见 [`DEMO.md`](DEMO.md)。
 
 ---
 
@@ -147,10 +151,11 @@ flowchart LR
 核心算法与真实接口解析均可离线测试，不依赖麦当劳 MCP：
 
 ```bash
-python -m pytest tests/ -q                 # 离线：33 例全过（含真实合同测试）
+python -m pytest tests/ -q                 # 离线：35 例全过（含真实合同测试）
 python src/coupon_optimizer.py             # 内置演示（基础优化器）
 python examples/demo_smart.py              # B/C/D/E 离线演示
 MCD_MCP_TOKEN=xxx pytest -m live -q        # 可选：真实端到端冒烟（initialize→list_tools→call_tool）
+MCD_MCP_TOKEN=xxx python examples/demo_live.py           # ⭐ 真实端到端演示（选店→拉券→官方核价）
 MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 两阶段真实官方核价演示
 ```
 
@@ -167,6 +172,7 @@ mcd-money-saver/
 ├── MCP_INTEGRATION.md          # 麦当劳 MCP 集成说明
 ├── mcp-config.example.json     # 脱敏 MCP 配置示例（仅环境变量占位符）
 ├── LIVE_TEST_LOG.md            # 真实 MCP 端到端测试报告
+├── DEMO.md                     # 真实端到端演示样例输出（可截图）
 ├── workbuddy.md                # WorkBuddy 联动开发上下文（专项奖励核验）
 ├── src/
 │   ├── coupon_optimizer.py     # 优惠券最优组合优化器（核心 + B/E + rank_candidates）
@@ -180,7 +186,9 @@ mcd-money-saver/
 │   ├── test_mcd_client.py      # 客户端解析单测 + 可选真实冒烟(-m live)
 │   └── fixtures/               # 真实 calculate-price 返回 + 真实菜单目录（脱敏）
 ├── examples/
-│   └── demo_smart.py           # B/C/D/E 端到端演示（离线 / --live）
+│   ├── demo_smart.py           # B/C/D/E 端到端演示（离线 / --live）
+│   └── demo_live.py            # ⭐ 真实 MCP 端到端演示（选店→拉券→官方核价）
+├── .github/workflows/ci.yml    # GitHub Actions：每次 push 自动跑离线测试
 ├── conftest.py / pytest.ini    # pytest 路径与标记配置
 └── references/
     └── mcp_tools.md            # 省钱场景 MCP 工具参考
