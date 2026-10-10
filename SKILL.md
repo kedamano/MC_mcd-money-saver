@@ -61,6 +61,10 @@ agent_created: true
 > 券面字段（门槛、折扣率、适用类目、有效期）以 MCP 实际返回为准；用 `now-time-info` 校验时效。
 
 ### 4. 跑优化器，挑最优组合
+> ⏱️ **先按时间有效性过滤**：用 `now-time-info` 拿到当前时间，调用
+> `filter_active_coupons(coupons, now="YYYY-MM-DD HH:MM")` 剔除「已过期 / 未生效 /
+> 不在每日时段窗（如仅 05:00-23:59 可用）」的券，再送优化器，避免算出用不了的券。
+
 将 `Item` 列表、`Coupon` 列表与 `delivery_fee` 写入临时输入，运行：
 
 ```bash
