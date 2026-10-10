@@ -37,6 +37,10 @@
 | 多池并集比券 | 门店券、我的券、麦麦省券一次性纳入候选 |
 | 最优叠加组合 | 满减 / 折扣 / 立减 / 免配送费 自动求最低价 |
 | 类目 & 互斥约束 | 支持类目限定券；订单级券至多一张，贴近真实规则 |
+| **产品级绑定** | 券按 `product_codes` 精确匹配，错配自动失效（B 优化项） |
+| **凑单建议** | 距满减门槛差 X 元时，反推最小代价加购组合，净亏不推（C 优化项） |
+| **两阶段核价** | 本地枚举 Top-K → 仅对少量候选调官方 `calculate-price` 取权威价（D 优化项） |
+| **时效与库存** | 过期券自动剔除、不可售商品提示移出优惠范围（E 优化项） |
 | 官方核价兜底 | 用 `calculate-price` 校验，避免"算得美、下单贵" |
 | 一键领券扩池 | `auto-bind-coupons` 自动领取麦麦省券再比价 |
 
@@ -85,9 +89,11 @@
 核心算法与真实接口解析均可离线测试，不依赖麦当劳 MCP：
 
 ```bash
-python -m pytest tests/ -q                 # 离线：19 例全过（含真实合同测试）
-python src/coupon_optimizer.py             # 内置演示
+python -m pytest tests/ -q                 # 离线：33 例全过（含真实合同测试）
+python src/coupon_optimizer.py             # 内置演示（基础优化器）
+python examples/demo_smart.py              # B/C/D/E 离线演示
 MCD_MCP_TOKEN=xxx pytest -m live -q        # 可选：真实端到端冒烟（initialize→list_tools→call_tool）
+MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 两阶段真实官方核价演示
 ```
 
 ## 仓库结构
@@ -103,14 +109,18 @@ mcd-money-saver/
 ├── workbuddy.md                # WorkBuddy 联动开发上下文（专项奖励核验）
 ├── src/
 │   ├── __init__.py
-│   ├── coupon_optimizer.py     # 优惠券最优组合优化器（核心源码）
-│   ├── coupon_adapter.py       # 真实券 JSON -> 领域 Coupon（类型/面额推断）
-│   └── mcd_client.py           # 麦当劳 MCP 真实客户端（Streamable HTTP，可运行）
+│   ├── coupon_optimizer.py     # 优惠券最优组合优化器（核心 + B/E + rank_candidates）
+│   ├── coupon_adapter.py       # 真实券 JSON -> 领域 Coupon（含 product_codes/expires_at）
+│   ├── coupon_smart.py         # C 凑单建议 + D 两阶段校验（智能决策增强）
+│   └── mcd_client.py           # 麦当劳 MCP 真实客户端（含 price_combo 官方核价）
 ├── tests/
-│   ├── test_coupon_optimizer.py# TDD 测试契约（10 例全过）
+│   ├── test_coupon_optimizer.py# TDD 测试契约（基础优化器）
+│   ├── test_enhancements.py    # B/C/D/E 契约测试
 │   ├── test_real_contract.py   # 真实合同测试（基于 fixtures 黄金基准）
 │   ├── test_mcd_client.py      # 客户端解析单测 + 可选真实冒烟(-m live)
-│   └── fixtures/               # 真实 calculate-price 返回（脱敏，固化基准）
+│   └── fixtures/               # 真实 calculate-price 返回 + 真实菜单目录（脱敏）
+├── examples/
+│   └── demo_smart.py           # B/C/D/E 端到端演示（离线 / --live）
 ├── conftest.py / pytest.ini    # pytest 路径与标记配置
 └── references/
     └── mcp_tools.md            # 省钱场景 MCP 工具参考
