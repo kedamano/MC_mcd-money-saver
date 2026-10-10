@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import combinations
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 
 @dataclass
@@ -49,6 +49,8 @@ class Coupon:
     product_codes: 产品级绑定；非空时**仅**对 product_code 命中的商品生效（见 B 优化项）
     stack_group:  同组券互斥，仅可叠加一张；None 表示无限制
     expires_at:   失效日期（YYYY-MM-DD）；非空且早于 now 视为过期（见 E 优化项）
+    valid_from:   生效日期（YYYY-MM-DD）；非空且晚于 now 视为"未到生效时间"（见 B 优化项）
+    time_windows: 每日可用时段，元素为 ("HH:MM","HH:MM")；非空且当前时刻不在任一区间内视为时段不符
     """
 
     id: str
@@ -60,6 +62,8 @@ class Coupon:
     product_codes: List[str] = field(default_factory=list)
     stack_group: Optional[str] = None
     expires_at: Optional[str] = None
+    valid_from: Optional[str] = None
+    time_windows: List[Tuple[str, str]] = field(default_factory=list)
     coupon_code: Optional[str] = None  # 真实券码（calculate-price 传参用）
     coupon_id: Optional[str] = None    # 真实券 ID（calculate-price 传参用）
 
@@ -237,6 +241,82 @@ def filter_valid_coupons(
         else:
             valid.append(c)
     return {"valid": valid, "expired": expired, "warnings": warnings}
+
+
+def _to_minutes(hhmm: str) -> int:
+    h, m = hhmm.split(":")
+    return int(h) * 60 + int(m)
+
+
+def _within_any_window(now_hhmm: str, windows: List[Tuple[str, str]]) -> bool:
+    """当前时刻是否落在任一每日时段窗内（支持跨零点，如 22:00-02:00）。"""
+    if not windows:
+        return True
+    now_min = _to_minutes(now_hhmm)
+    for start, end in windows:
+        s, e = _to_minutes(start), _to_minutes(end)
+        if s <= e:
+            if s <= now_min <= e:
+                return True
+        else:  # 跨零点
+            if now_min >= s or now_min <= e:
+                return True
+    return False
+
+
+def filter_active_coupons(coupons: List[Coupon], now: Optional[str] = None) -> dict:
+    """按「生效日期 + 失效日期 + 每日时段」三重维度过滤券（B 优化项）。
+
+    now: "YYYY-MM-DD HH:MM"（缺省视为不过滤，全部有效）。
+    真实 observe：我的券有效期形如
+        "2026-10-10 00:00-2026-11-08 23:59 05:00-23:59"
+    即「起-止日期」+「每日可用时段(05:00-23:59)」。很多券只在特定时段可用，
+    只判过期会漏掉"未到生效时间"和"时段不符"两种情况。
+
+    返回：
+        {
+            "valid":          List[Coupon]  # 当前可用
+            "expired":        List[Coupon]  # 已过期
+            "not_effective":  List[Coupon]  # 未到生效时间
+            "outside_window": List[Coupon]  # 不在可用时段
+            "warnings":       List[str]
+        }
+    """
+    valid: List[Coupon] = []
+    expired: List[Coupon] = []
+    not_effective: List[Coupon] = []
+    outside_window: List[Coupon] = []
+    warnings: List[str] = []
+
+    date = time = None
+    if now:
+        parts = now.strip().split()
+        date = parts[0] if parts else None
+        time = parts[1] if len(parts) > 1 else None
+
+    for c in coupons:
+        if c.expires_at and date and date > c.expires_at:
+            expired.append(c)
+            warnings.append(f"券 {c.id} 已于 {c.expires_at} 过期，已忽略")
+            continue
+        if c.valid_from and date and date < c.valid_from:
+            not_effective.append(c)
+            warnings.append(f"券 {c.id} 于 {c.valid_from} 起生效（当前未生效），已忽略")
+            continue
+        if c.time_windows and time and not _within_any_window(time, c.time_windows):
+            outside_window.append(c)
+            wins = "、".join(f"{s}-{e}" for s, e in c.time_windows)
+            warnings.append(f"券 {c.id} 仅限时段 {wins} 使用（当前 {time}），已忽略")
+            continue
+        valid.append(c)
+
+    return {
+        "valid": valid,
+        "expired": expired,
+        "not_effective": not_effective,
+        "outside_window": outside_window,
+        "warnings": warnings,
+    }
 
 
 def check_item_availability(items: List[Item]) -> List[str]:
