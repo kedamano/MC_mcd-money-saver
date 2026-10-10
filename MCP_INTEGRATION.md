@@ -54,3 +54,35 @@
 - 配置文件与仓库中**不包含任何真实 Token/密钥**，一律使用 `${MCD_MCP_TOKEN}` 环境变量占位符。
 - 仅以非商业、参赛展示目的使用麦当劳 MCP，遵守《麦当劳 MCP 服务规则》。
 - 项目输出仅供参考，餐品价格、供应与优惠以麦当劳官方实时结果为准。
+
+## 6. 真机联调验证记录（2026-10-10）
+
+已使用真实 MCP Token 完成端到端联调，以下结论为本项目与官方 MCP 对接的权威依据。
+
+### 6.1 验证通过的能力链路
+
+| 环节 | Tool | 真实结果 |
+|---|---|---|
+| 时间 | `now-time-info` | 返回服务器时间 2026-10-10（北京时间） |
+| 可领券 | `available-coupons` | 返回麦麦省可领券（如"巧克力味厚松饼猪柳蛋套餐"） |
+| 我的券 | `query-my-coupons` | 返回卡包券（如"新人专享-中杯美式7折 ¥13.3"） |
+| 选门店 | `query-nearby-stores` | 成功返回门店列表，如 storeCode=1450713（上海黄浦华旭国际大厦餐厅） |
+| 门店券 | `query-store-coupons` | 返回门店可用券（含 couponCode / couponId / productCode） |
+| 菜单 | `query-meals` | 返回分类与商品映射（code=productCode、currentPrice 等） |
+| 核价 | `calculate-price` | 基础价与带券价均正确（见 6.3） |
+
+### 6.2 对接中踩过的真实坑（已在 SKILL.md 中规避）
+
+1. **鉴权格式**：必须是 `Authorization: Bearer <token>`，缺少 `Bearer ` 前缀会被服务器拒绝。Token 须通过 open.mcd.cn/mcp 控制台"一键复制"获取——手动选中复制易截断导致 401「鉴权码不存在或已失效」。
+2. **门店搜索**：`query-nearby-stores` 在 `searchType=2` 下必须**同时传 `city` 与 `keyword`**，否则报 600058「城市名或者关键词不能为空」；`searchType=1`（收藏）在无收藏时也会要求 city+keyword。
+3. **到店门店无 beCode**：`beType=1`（到店自提）返回的门店**不带 beCode**，后续 `query-store-coupons` / `query-meals` / `calculate-price` 调用时**不传 beCode**（外送/得来速/团餐才需要）。
+4. **算价商品字段**：`calculate-price` 的 `items[]` 用 **`productCode`**（与菜单 `code` 一致），不是 `code`；金额以**分**为单位返回。
+5. **券可直传算价**：`items[]` 支持直接带 `couponCode` + `couponId`，优惠券会在 `discount` 字段正确体现——这正是本助手"最优组合核价"的实现基础。
+6. **券商品需带券**：以 `990000` 开头的券商品（如 9900000119 美式中杯）基础算价返回空，必须配合对应券；常规售卖商品（如 520689 鲜萃咖啡）可直接基础算价。
+
+### 6.3 实测核价样例
+
+- 美式中杯 `9900000119` + 新人专享7折券（couponCode `MCD689H051J0J01C0Y078`）→ 原价 ¥19.00 / 优惠 ¥5.70 / **现价 ¥13.30**
+- 小杯鲜萃咖啡 `520689` 基础算价 → 原价 ¥9.50 / 优惠 ¥0.00 / **现价 ¥9.50**
+
+> 结论：优惠券在 `calculate-price` 中可正确生效，本项目的"三池比券 + 最优组合 + 官方核价"省钱闭环在真实 MCP 上成立。
