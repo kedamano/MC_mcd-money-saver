@@ -9,7 +9,7 @@
   <a href="https://github.com/kedamano/mcd-money-saver/issues"><img src="https://img.shields.io/github/issues/kedamano/mcd-money-saver" alt="GitHub issues"></a>
   <img src="https://img.shields.io/badge/license-参赛声明-brightgreen" alt="License">
   <img src="https://img.shields.io/badge/Python-3.11%2B-blue" alt="Python">
-  <img src="https://img.shields.io/badge/tests-63%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-73%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/MCP-35%20tools%20live-orange" alt="MCP">
   <img src="https://img.shields.io/badge/Contest-麦当劳MCP大赛-ffc72c" alt="Contest">
 </p>
@@ -33,26 +33,39 @@
 
 ## 📊 真实数据说话（不是 Demo，是真连）
 
-本项目**真实接入麦当劳 MCP**，并通过 WorkBuddy MCP 通道跑通了端到端链路（2026-10-10 实测）：
+本项目**真实接入麦当劳 MCP**，跨多城门店跑通端到端链路（2026-10-10 实测）：
 
 | 环节 | 工具 | 真实结果 |
 |---|---|---|
 | 取时间 | `now-time-info` | 返回服务器时间（GMT+8）✅ |
-| 搜门店 | `query-nearby-stores` | 上海南京东路 5 家，最近 194m ✅ |
-| 拉菜单 | `query-meals` | 全分类现价（巨无霸 ¥25.5 / 中薯条 ¥13.5 …）✅ |
-| 查券 | `query-store-coupons` | 2 张新人券：美式7折 / 奶铁7折 ✅ |
-| 核价 | `calculate-price` | 见下 ✅ |
+| 搜门店 | `query-nearby-stores` | 上海 / 北京 / 广州 / 深圳 **4 城**定位，各取最近门店 ✅ |
+| 拉菜单 | `query-meals` | 各店真实现价（上海 121 项 / 广州 129 项，**单价随店而变**）✅ |
+| 查券 | `query-store-coupons` | 跨城新人券：中杯美式 7 折 / 中杯奶铁 7 折 ✅ |
+| 核价 | `calculate-price` | 多门店多场景对比（见下）✅ |
 
-### 💰 真实核价对比（金额单位：分，来自官方 `calculate-price`）
+### 💰 真实核价对比 · 多门店多场景（金额来自官方 `calculate-price`）
 
-| 场景 | 购物车 | 原价 | 用券后 | **省** |
-|---|---|---|---|---|
-| 美式中杯7折券 | 美式中杯 + 巨无霸 + 中薯条 | ¥58.00 | **¥52.30** | **¥5.70** |
+> 下面每一行都来自**真实门店 + 真实菜单 + 真实券 + 官方核价**（2026-10-10 实测，非模拟）。
 
-> 美式中杯 ¥19.00 × 0.7 = ¥13.30，与券面"7 折"**完全吻合**，`discount=570` 分，服务端权威价与本地计算一致。
-> 更妙的是：美式中杯是**券锁定商品**——没券时 `calculate-price` 会直接把它踢出订单。这正是本 Skill 用 `product_codes` 做"券↔商品"精确绑定的现实依据。
+| 城市 · 门店 | 门店编号 | 场景 | 购物车 | 原价 | 用券后 | **省** |
+|---|---|---|---:|---:|---:|---:|
+| 上海 · 悦荟广场 | `1450104` | 无券基线 | 美式中杯 + 巨无霸 + 中薯条 | ¥39.00 | ¥39.00 | ¥0 |
+| 上海 · 悦荟广场 | `1450104` | 中杯美式 7 折券 | 同上 | ¥58.00 | **¥52.30** | **¥5.70** |
+| 北京 · 新东安二号 | `1950526` | 无券基线 | 中杯奶铁 + 巨无霸 + 可乐 | ¥36.00 | ¥36.00 | ¥0 |
+| 北京 · 新东安二号 | `1950526` | 中杯奶铁 7 折券 | 同上 | ¥57.00 | **¥50.70** | **¥6.30** |
+| 广州 · 今日广场 | `1400011` | 无券基线 | 美式中杯 + 巨无霸 + 中薯条 | ¥41.00 | ¥41.00 | ¥0 |
+| 广州 · 今日广场 | `1400011` | 中杯美式 7 折券 | 同上 | ¥60.00 | **¥54.30** | **¥5.70** |
+| 深圳 · 华强北茂业 | `1421180` | 无券基线 | 美式中杯 + 巨无霸 | ¥25.50 | ¥25.50 | ¥0 |
+| 上海 · 悦荟广场 | `1450104` | ⚠️ 双券叠加（负例） | 美式券 + 奶铁券 | — | ❌ 官方拒绝 | `code 600022` |
 
-**自动化验证**：`pytest` 回归 **67 passed（离线 63 + 真实 live 4；另有 1 例真实下单受保护、默认跳过）**。其中 `test_live_end_to_end` 走项目自带 Python 客户端（`mcd_client.py`，纯标准库）真实连通 `initialize → list_tools(35) → now-time-info`；`test_live_calibration` 用真实返回值校准本地价格模型与官方一致；`test_scale_pruning` / `test_topk_pruning` 以 40 组随机用例证明**分支限界与暴力枚举同解**（单最优 + Top-K 两条路径）。
+### 🔍 真机才挖得到的 4 条真实业务规则
+
+1. **每单仅限一张券** — 一单同时传两张券，官方直接返回 `code=600022「暂不支持多张券使用」`。→ 本 Skill 的**真实核价路径默认 `max_coupons_per_order=1`**（`two_stage_optimize`），本地粗排同样遵守，避免排出官方必然拒绝的组合。
+2. **券锁定商品会被静默剔除** — `9900000119 美式中杯`、`9900000117 中杯奶铁` 是**券锁定商品**：无券时 `calculate-price` 直接把它们踢出订单（上海 ¥58 → ¥39、深圳只剩 ¥25.50 的巨无霸）。这正是本 Skill 用 `product_codes` 做「券 ↔ 商品」精确绑定、并**先绑定商品再核价**的现实依据。
+3. **同品不同城不同价** — 巨无霸：上海 ¥25.50 / 北京 ¥26.50；中薯条：上海 ¥13.50 / 广州 ¥14.50。→ 所以**必须按门店实时菜单取价**，绝不能用全局价目表。
+4. **折扣与券面精确吻合** — 美式中杯 ¥19.00 × 0.7 = ¥13.30（`discount=570` 分）；中杯奶铁 ¥21.00 × 0.7 = ¥14.70（`discount=630` 分），服务端权威价与本地模型一致。
+
+**自动化验证**：`pytest` 回归 **72 passed（离线 68 + 真实 live 4；另有 1 例真实下单受保护、默认跳过）**，共 73 用例。其中 `test_live_end_to_end` 走项目自带 Python 客户端（`mcd_client.py`，纯标准库）真实连通 `initialize → list_tools(35) → now-time-info`；`test_live_calibration` 用真实返回值校准本地价格模型与官方一致；`test_scale_pruning` / `test_topk_pruning` 以 40 组随机用例证明**分支限界与暴力枚举同解**（单最优 + Top-K 两条路径）；`test_one_coupon_rule` 锁定**每单至多一张券**的真实规则。
 
 > 🎬 **想看完整真实链路？** 运行 `MCD_MCP_TOKEN=xxx python examples/demo_live.py`，
 > 一条命令跑通「时间 → 门店 → 菜单 → 优惠券 → 官方核价」，样例输出见 [`DEMO.md`](DEMO.md)。
@@ -152,7 +165,7 @@ flowchart LR
 核心算法与真实接口解析均可离线测试，不依赖麦当劳 MCP：
 
 ```bash
-python -m pytest tests/ -q                 # 离线：63 例全过（含真实合同测试）
+python -m pytest tests/ -q                 # 离线：68 例全过（含真实合同测试）
 python scripts/doctor.py                   # 环境自检：查 mcp.json 的 type / Token 前缀
 python src/coupon_optimizer.py             # 内置演示（基础优化器）
 python examples/demo_smart.py              # B/C/D/E 离线演示
