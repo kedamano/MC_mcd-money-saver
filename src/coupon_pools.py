@@ -27,6 +27,8 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List, Optional
 
+from src.coupon_optimizer import infer_channel_from_tag
+
 # ---- 我的券（query-my-coupons）Markdown 解析 ----
 _RE_MY_PRICE = re.compile(r"\*\*优惠\*\*:\s*(.+)")
 _RE_MY_VALID = re.compile(r"\*\*有效期\*\*:\s*(.+)")
@@ -56,8 +58,9 @@ def parse_valid_period(text: str):
 def parse_my_coupons_text(text: str) -> List[Dict[str, Any]]:
     """解析 `query-my-coupons` 的 Markdown，返回券条目列表。
 
-    每条含：name / price_text / valid_period / expires_at / tag / image / coupon_id。
+    每条含：name / price_text / valid_period / expires_at / tag / image / coupon_id / channel。
     coupon_id 仅在图片文件名是 32 位十六进制时可得（部分券图片是中文名，取不到）。
+    channel 由 **标签** 字段推断（如「到店专用」→ dine_in）；无法判定为 None（不限渠道）。
     """
     out: List[Dict[str, Any]] = []
     blocks = re.split(r"^##\s+", text, flags=re.MULTILINE)[1:]
@@ -91,6 +94,7 @@ def parse_my_coupons_text(text: str) -> List[Dict[str, Any]]:
                 "expires_at": expires_at,
                 "time_windows": windows,
                 "tag": tag,
+                "channel": infer_channel_from_tag(tag),
                 "image": image,
                 "coupon_id": cid,
             }
