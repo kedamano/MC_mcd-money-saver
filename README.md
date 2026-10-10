@@ -9,7 +9,7 @@
   <a href="https://github.com/kedamano/mcd-money-saver/issues"><img src="https://img.shields.io/github/issues/kedamano/mcd-money-saver" alt="GitHub issues"></a>
   <img src="https://img.shields.io/badge/license-参赛声明-brightgreen" alt="License">
   <img src="https://img.shields.io/badge/Python-3.11%2B-blue" alt="Python">
-  <img src="https://img.shields.io/badge/tests-58%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-63%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/MCP-35%20tools%20live-orange" alt="MCP">
   <img src="https://img.shields.io/badge/Contest-麦当劳MCP大赛-ffc72c" alt="Contest">
 </p>
@@ -52,7 +52,7 @@
 > 美式中杯 ¥19.00 × 0.7 = ¥13.30，与券面"7 折"**完全吻合**，`discount=570` 分，服务端权威价与本地计算一致。
 > 更妙的是：美式中杯是**券锁定商品**——没券时 `calculate-price` 会直接把它踢出订单。这正是本 Skill 用 `product_codes` 做"券↔商品"精确绑定的现实依据。
 
-**自动化验证**：`pytest` 回归 **62 passed（离线 58 + 真实 live 4；另有 1 例真实下单受保护、默认跳过）**。其中 `test_live_end_to_end` 走项目自带 Python 客户端（`mcd_client.py`，纯标准库）真实连通 `initialize → list_tools(35) → now-time-info`；`test_live_calibration` 用真实返回值校准本地价格模型与官方一致；`test_scale_pruning` 以 40 组随机用例证明**分支限界与暴力枚举同解**。
+**自动化验证**：`pytest` 回归 **67 passed（离线 63 + 真实 live 4；另有 1 例真实下单受保护、默认跳过）**。其中 `test_live_end_to_end` 走项目自带 Python 客户端（`mcd_client.py`，纯标准库）真实连通 `initialize → list_tools(35) → now-time-info`；`test_live_calibration` 用真实返回值校准本地价格模型与官方一致；`test_scale_pruning` / `test_topk_pruning` 以 40 组随机用例证明**分支限界与暴力枚举同解**（单最优 + Top-K 两条路径）。
 
 > 🎬 **想看完整真实链路？** 运行 `MCD_MCP_TOKEN=xxx python examples/demo_live.py`，
 > 一条命令跑通「时间 → 门店 → 菜单 → 优惠券 → 官方核价」，样例输出见 [`DEMO.md`](DEMO.md)。
@@ -152,7 +152,7 @@ flowchart LR
 核心算法与真实接口解析均可离线测试，不依赖麦当劳 MCP：
 
 ```bash
-python -m pytest tests/ -q                 # 离线：58 例全过（含真实合同测试）
+python -m pytest tests/ -q                 # 离线：63 例全过（含真实合同测试）
 python scripts/doctor.py                   # 环境自检：查 mcp.json 的 type / Token 前缀
 python src/coupon_optimizer.py             # 内置演示（基础优化器）
 python examples/demo_smart.py              # B/C/D/E 离线演示
@@ -189,6 +189,7 @@ mcd-money-saver/
 │   ├── test_coupon_pools.py    # 三池 Markdown 解析 + 聚合测试
 │   ├── test_time_window.py     # 生效时间 / 每日时段窗过滤测试
 │   ├── test_scale_pruning.py   # 大规模券剪枝 + 分支限界（与暴力枚举同解 + 性能）
+│   ├── test_topk_pruning.py    # Top-K 候选的分支限界（rank_candidates 与暴力枚举同值）
 │   ├── test_live_calibration.py# 本地价格模型 vs 官方核价（live 校准）
 │   ├── test_mcd_client.py      # 客户端解析单测 + 可选真实冒烟(-m live)
 │   └── fixtures/               # 真实 calculate-price 返回 + 真实菜单目录（脱敏）
