@@ -1,0 +1,18 @@
+{
+  "_note": "真实 calculate-price 外送返回（上海食品一店 storeCode=1450056 / beCode=145005602，2026-10-10 实测）。金额单位为分（整数）。",
+  "productOriginalPrice": 6050,
+  "productPrice": 5340,
+  "deliveryOriginalPrice": 600,
+  "deliveryPrice": 600,
+  "packingOriginalPrice": 300,
+  "packingPrice": 300,
+  "originalPrice": 6950,
+  "discount": 710,
+  "price": 6240,
+  "productList": [
+    {"productCode": "901000", "productName": "汉堡包", "quantity": 2, "originalSubtotal": 3000, "subtotal": 3000},
+    {"productCode": "507328", "productName": "麦咖啡™热奶铁中杯", "quantity": 1, "originalSubtotal": 2100, "subtotal": 1390},
+    {"productCode": "521741", "productName": "脆薯饼", "quantity": 1, "originalSubtotal": 950, "subtotal": 950},
+    {"productCode": "920174", "productName": "打包服务费", "quantity": 30, "originalSubtotal": 300, "subtotal": 0}
+  ]
+}
