@@ -33,9 +33,11 @@
   .lead b{color:var(--txt)}
   .cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
   .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:11px;
-    font-weight:700;font-size:14.5px;text-decoration:none;border:1px solid transparent;transition:.15s}
+    font-weight:700;font-size:14.5px;text-decoration:none;border:1px solid transparent;transition:.15s;
+    cursor:pointer;font-family:inherit}
   .btn-p{background:linear-gradient(135deg,var(--gold),#ffb400);color:#22180a}
   .btn-p:hover{transform:translateY(-1px);box-shadow:0 10px 26px -12px rgba(255,199,44,.75)}
+  .btn-p:disabled{opacity:.55;cursor:not-allowed;transform:none;box-shadow:none}
   .btn-s{border-color:var(--line);color:var(--txt);background:var(--panel)}
   .btn-s:hover{border-color:#3a4763}
   .tiny{color:var(--muted);font-size:12.5px}
@@ -78,6 +80,25 @@
   .t-promo{background:rgba(61,220,151,.14);color:var(--green)}
   .t-coupon{background:rgba(218,41,28,.18);color:var(--red2)}
   .t-none{background:rgba(90,169,255,.13);color:var(--blue)}
+  .tag.ai{background:rgba(90,169,255,.18);color:var(--blue)}
+
+  /* ---------- AI 配单 ---------- */
+  .ai{margin:16px 0 0;background:linear-gradient(135deg,#101a2b,#12161e);
+    border:1px solid rgba(90,169,255,.32);border-radius:15px;padding:15px 17px}
+  .ai .ah{font-weight:800;font-size:14.5px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:10px}
+  .ai .ah em{font-style:normal;color:var(--blue);font-size:12px;font-weight:700;
+    border:1px solid rgba(90,169,255,.4);background:rgba(90,169,255,.1);padding:2px 8px;border-radius:999px}
+  .ai .row{display:flex;gap:10px;flex-wrap:wrap}
+  .ai input{flex:1;min-width:220px;background:#0b0f17;border:1px solid var(--line);border-radius:11px;
+    padding:11px 14px;color:var(--txt);font:inherit;font-size:14px}
+  .ai input:focus{outline:2px solid rgba(90,169,255,.5);outline-offset:1px;border-color:rgba(90,169,255,.5)}
+  .ai .out{margin-top:12px;background:#0d121b;border:1px solid var(--line);border-radius:11px;
+    padding:12px 14px;font-size:13.5px;color:#cfe0f7}
+  .ai .out b{color:var(--gold)}
+  .ai .out .err{color:#ffb3ad}
+  .ai .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,199,44,.35);
+    border-top-color:var(--gold);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
 
   /* ---------- 结算卡 ---------- */
   .bill{background:linear-gradient(180deg,#171c27,#12161e);border:1px solid var(--line);
@@ -105,9 +126,47 @@
   .card h4{margin:9px 0 7px;font-size:15px}
   .card p{margin:0;color:var(--dim);font-size:13.5px}
   .card code{background:#0a0d13;border:1px solid #222b3d;border-radius:5px;padding:1px 5px;font-size:12.5px;color:var(--gold2)}
-  footer{border-top:1px solid var(--line);margin-top:26px;padding:26px 0 46px;color:var(--muted);font-size:12.5px}
+
+  /* ---------- 省钱墙 ---------- */
+  .savebar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--panel);
+    border:1px solid var(--line);border-radius:15px;padding:15px 17px}
+  .savebar input{flex:1;min-width:190px;background:#0b0f17;border:1px solid var(--line);border-radius:11px;
+    padding:11px 14px;color:var(--txt);font:inherit;font-size:14px}
+  .savebar input:focus{outline:2px solid rgba(255,199,44,.45);outline-offset:1px;border-color:rgba(255,199,44,.45)}
+  .msg{font-size:12.5px}
+  .msg.ok{color:var(--green)}
+  .msg.bad{color:#ffb3ad}
+  .stats{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 8px}
+  .stat{flex:1;min-width:150px;background:linear-gradient(135deg,#1b2130,#141821);border:1px solid var(--line);
+    border-radius:13px;padding:13px 16px}
+  .stat .k{font-size:12px;color:var(--muted)}
+  .stat .v{font-size:22px;font-weight:800;color:var(--gold);letter-spacing:-.5px}
+  .wall{display:grid;grid-template-columns:1.25fr .75fr;gap:16px;align-items:start;margin-top:6px}
+  @media(max-width:860px){.wall{grid-template-columns:1fr}}
+  .wall-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px}
+  .wall-list li{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13.5px}
+  .wall-list .wh{display:flex;justify-content:space-between;gap:10px;font-weight:700}
+  .wall-list .wa{color:var(--dim);font-size:12.5px;margin-top:4px;word-break:break-all}
+  .wall-list .wm{color:var(--muted);font-size:12px;margin-top:3px;display:flex;gap:12px;flex-wrap:wrap}
+  .rank{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+  .rank li{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);
+    border-radius:11px;padding:10px 13px;font-size:13.5px}
+  .rank .no{flex:0 0 22px;height:22px;border-radius:7px;background:#0d121b;border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;color:var(--muted)}
+  .rank li:nth-child(1) .no{background:rgba(255,199,44,.18);border-color:rgba(255,199,44,.45);color:var(--gold)}
+  .rank .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rank .sv{color:var(--green);font-weight:800}
+  .pane{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:16px 17px}
+  .pane h4{margin:0 0 12px;font-size:14px;color:var(--dim);font-weight:700}
+
   .note{background:rgba(90,169,255,.08);border:1px solid rgba(90,169,255,.28);border-radius:12px;
     padding:12px 15px;color:#bcd6f5;font-size:13px;margin-top:18px}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;padding:3px 9px;
+    border-radius:999px;background:rgba(61,220,151,.14);color:var(--green);border:1px solid rgba(61,220,151,.35)}
+  .pill.off{background:rgba(107,119,147,.16);color:var(--muted);border-color:var(--line)}
+  #selfcheckOut{white-space:pre-wrap;font:12.5px/1.7 ui-monospace,Consolas,monospace;background:#0a0d13;
+    border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:16px;max-height:60vh;overflow:auto}
+  footer{border-top:1px solid var(--line);margin-top:26px;padding:26px 0 46px;color:var(--muted);font-size:12.5px}
 </style>
 </head>
 <body>
@@ -125,12 +184,13 @@
       <a class="btn btn-p" href="https://github.com/kedamano/mcd-money-saver" target="_blank" rel="noopener noreferrer">⭐ 去 GitHub 点个 Star</a>
       <a class="btn btn-s" href="#demo">👇 先玩一下试试</a>
     </div>
-    <p class="tiny">175 项测试（离线 170 全绿）· 真机联调 mcp.mcd.cn 35 个工具 · 覆盖到店与外送</p>
+    <p class="tiny">175 项测试（离线 170 全绿）· 真机联调 mcp.mcd.cn 35 个工具 · 覆盖到店与外送 ·
+      <span class="pill" id="cloudPill"><span id="cloudDot">●</span> 正在连接云服务…</span></p>
   </header>
 
   <section id="demo">
     <h2>今日最省点法 · 实时算给你看</h2>
-    <p class="sub">勾选你想点的东西，下面立刻算出<b>最优下单方案</b>。数据为 <b>2026-10-10 15:44 深圳蛇口网谷餐厅真实核价快照</b>（非实时）。</p>
+    <p class="sub">勾选你想点的东西，下面立刻算出<b>最优下单方案</b>。菜单与价格为 <b>2026-10-10 15:44 深圳蛇口网谷餐厅真实核价快照</b>；「AI 配单」与「省钱墙」为<b>实时云端能力</b>。</p>
 
     <div class="store">
       <div>
@@ -145,7 +205,19 @@
     </div>
 
     <div class="cols">
-      <div class="picker" id="picker"></div>
+      <div>
+        <div class="picker" id="picker"></div>
+
+        <div class="ai">
+          <div class="ah">🤖 AI 帮我来一单 <em>云端大模型 · 免密钥</em>
+            <span class="tiny" id="aiModel" style="font-weight:400"></span></div>
+          <div class="row">
+            <input id="aiNeed" placeholder="说说你想吃什么，例如：想喝咖啡配个堡，预算 40 以内" maxlength="60">
+            <button class="btn btn-p" id="aiBtn" type="button">生成方案</button>
+          </div>
+          <div class="out" id="aiOut" hidden></div>
+        </div>
+      </div>
 
       <div class="bill" aria-live="polite">
         <h3>结算台</h3>
@@ -164,6 +236,34 @@
       ⚠️ <b>一个真实大坑：</b>把「套餐」和「券」放进<b>同一单</b>，官方会直接拒绝，返回
       <code>code 600012「促销规则不支持该商品」</code>——券白瞎。
       在深圳这个案例里，同单到手 <b>¥38.80</b>，<b>拆成两单只要 ¥36.80</b>。这就是本 Skill 要做「拆单」的原因。
+    </div>
+  </section>
+
+  <section id="wall">
+    <h2>省钱墙 · 大家的最省方案</h2>
+    <p class="sub">把上面算好的方案存进<b>云端数据库</b>（免登录，公开可见）。数据落在本应用的云服务环境里，刷新、换设备都在。</p>
+
+    <div class="savebar">
+      <input id="nick" placeholder="留个昵称（≤12 字，可留空）" maxlength="12">
+      <button class="btn btn-p" id="saveBtn" type="button">📌 保存我的方案到云端</button>
+      <span class="msg tiny" id="saveMsg"></span>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="k">全站已保存方案</div><div class="v" id="statCount">–</div></div>
+      <div class="stat"><div class="k">累计帮大家省下</div><div class="v" id="statSaved">–</div></div>
+      <div class="stat"><div class="k">云端环境</div><div class="v" style="font-size:14px;color:var(--green)" id="statEnv">–</div></div>
+    </div>
+
+    <div class="wall">
+      <div class="pane">
+        <h4>最新方案（实时从云端读取）</h4>
+        <ul class="wall-list" id="wallList"><li class="tiny">加载中…</li></ul>
+      </div>
+      <div class="pane">
+        <h4>省钱榜 <span class="tiny" style="font-weight:400">（云端聚合 RPC）</span></h4>
+        <ul class="rank" id="rankList"><li class="tiny" style="border:none;background:none">加载中…</li></ul>
+      </div>
     </div>
   </section>
 
@@ -216,41 +316,45 @@
   </section>
 
   <footer>
-    数据来源：麦当劳中国 MCP Server（<code>mcp.mcd.cn</code>）真实调用返回，采集于 2026-10-10 15:44（北京时间），
-    门店 <b>1420621</b>。本页面为**离线演示**，用真实快照数据复现计算逻辑，不连接实时接口、不涉及任何账号信息。<br>
-    麦麦省钱助手 · 麦当劳程序员创意开发大赛参赛作品 · 本页面金额均来自官方 <code>calculate-price</code> 返回，未做美化性修改。
+    数据来源：麦当劳中国 MCP Server（<code>mcp.mcd.cn</code>）真实调用返回，菜单与价格采集于 2026-10-10 15:44（北京时间），
+    门店 <b>1420621</b>。<br>
+    「省钱墙」与「AI 配单」由本应用的<b>云服务</b>实时提供（云数据库 + 云端大模型），不涉及任何麦当劳账号信息；
+    金额计算逻辑用真实核价快照复现，未做美化性修改。<br>
+    麦麦省钱助手 · 麦当劳程序员创意开发大赛参赛作品。
   </footer>
 </div>
 
+<!-- 云服务 SDK（CDN 形式：本页为无构建步骤的单文件页面） -->
+<script src="https://cdn.jsdelivr.net/npm/@tencent-ai/workbuddy-cloud-sdk@dev/lib/index.global.js"></script>
 <script>
 (function () {
   "use strict";
 
-  // ---- 真实菜单与券（2026-10-10 深圳蛇口网谷 1420621，官方核价快照）----
+  /* ================= 真实菜单与券（2026-10-10 深圳蛇口网谷 1420621，官方核价快照）================= */
   var MENU = [
     {
       id: "combo", emoji: "🍔", name: "龙焰鸡腿堡三件套",
       note: "龙焰鸡腿堡 + 中薯条 + 中可乐 · 单点同款 ¥47.00",
       alaCarte: 47.00, kind: "promo", tag: "套餐 · 省 ¥20.10",
-      price: 26.90, show: 26.90
+      price: 26.90
     },
     {
       id: "amer", emoji: "☕", name: "麦咖啡 中杯冰美式",
       note: "9.9 元中杯冰美式券（今日可用）",
       alaCarte: 19.00, kind: "coupon", tag: "券 · 省 ¥9.10",
-      price: 9.90, show: 9.90
+      price: 9.90
     },
     {
       id: "latte", emoji: "🥛", name: "麦咖啡 中杯奶铁",
       note: "新人专享 7 折券（每日 05:00–23:59）",
       alaCarte: 21.00, kind: "coupon", tag: "券 · 省 ¥6.30",
-      price: 14.70, show: 14.70
+      price: 14.70
     },
     {
       id: "mcflurry", emoji: "🍦", name: "麦旋风（买一送一）",
       note: "10:00–22:00 · 两个只花一个钱",
       alaCarte: 31.00, kind: "coupon", tag: "券 · 省 ¥15.50",
-      price: 15.50, show: 15.50
+      price: 15.50
     }
   ];
 
@@ -264,10 +368,22 @@
   var saveAmt = document.getElementById("saveAmt");
   var ordersEl = document.getElementById("orders");
   var warnBox = document.getElementById("warnBox");
+  var boxes = {};          // id -> <input>
+  var itemEls = {};        // id -> <label>
 
-  function yuan(n) { return "¥" + n.toFixed(2); }
+  function yuan(n) { return "¥" + Number(n || 0).toFixed(2); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function fmtTime(iso) {
+    try {
+      return new Date(iso).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false });
+    } catch (e) { return String(iso); }
+  }
 
-  // 渲染可选商品
+  /* ================= 渲染：可选商品 ================= */
   MENU.forEach(function (m) {
     var lab = document.createElement("label");
     lab.className = "item" + (state[m.id] ? " on" : "");
@@ -277,74 +393,481 @@
       '<input type="checkbox" id="chk-' + m.id + '"' + (state[m.id] ? " checked" : "") + '>' +
       '<span class="box" aria-hidden="true">✓</span>' +
       '<span class="body">' +
-        '<span class="t">' + m.emoji + " " + m.name +
-          '<span class="tag ' + tagCls + '">' + m.tag + "</span></span>" +
-        '<span class="n">' + m.note + "</span>" +
+        '<span class="t">' + esc(m.emoji + " " + m.name) +
+          '<span class="tag ' + tagCls + '">' + esc(m.tag) + "</span></span>" +
+        '<span class="n">' + esc(m.note) + "</span>" +
       "</span>" +
       '<span class="p"><b>' + yuan(m.price) + "</b><s>" + yuan(m.alaCarte) + "</s></span>";
-    lab.querySelector("input").addEventListener("change", function (e) {
+    var input = lab.querySelector("input");
+    input.addEventListener("change", function (e) {
       state[m.id] = e.target.checked;
       lab.classList.toggle("on", e.target.checked);
       render();
     });
+    boxes[m.id] = input;
+    itemEls[m.id] = lab;
     pickerEl.appendChild(lab);
   });
 
-  function render() {
+  function setSelection(ids) {
+    MENU.forEach(function (m) {
+      var on = ids.indexOf(m.id) >= 0;
+      state[m.id] = on;
+      if (boxes[m.id]) boxes[m.id].checked = on;
+      if (itemEls[m.id]) itemEls[m.id].classList.toggle("on", on);
+    });
+    render();
+  }
+
+  /* ================= 计算：最优（拆单）方案 ================= */
+  // 真实规则：每单一张券（600022）；套餐是促销商品，与券互斥（600012）→ 必须拆单。
+  function computePlan() {
     var picked = MENU.filter(function (m) { return state[m.id]; });
     var base = picked.reduce(function (s, m) { return s + m.alaCarte; }, 0);
-
-    // 分组：套餐促销各占一单；每张券各占一单（真实规则：每单一张券 + 套餐与券互斥）
     var orders = [];
     picked.forEach(function (m) {
       if (m.kind === "promo") {
-        orders.push({
-          title: "单 " + (orders.length + 1) + " · 套餐促销",
-          detail: m.name + "（套餐价，本单不叠券）",
-          price: m.price
-        });
+        orders.push({ title: "套餐促销", detail: m.name + "（套餐价，本单不叠券）", price: m.price });
       } else if (m.kind === "coupon") {
-        orders.push({
-          title: "单 " + (orders.length + 1) + " · 用券",
-          detail: m.name + " · " + m.note,
-          price: m.price
-        });
+        orders.push({ title: "用券", detail: m.name + " · " + m.note, price: m.price });
       } else {
-        orders.push({ title: "单 " + (orders.length + 1), detail: m.name, price: m.alaCarte });
+        orders.push({ title: "单点", detail: m.name, price: m.alaCarte });
       }
     });
-
     var total = orders.reduce(function (s, o) { return s + o.price; }, 0);
-    var disc = base - total;
+    return { picked: picked, base: base, orders: orders, total: total, disc: base - total };
+  }
 
-    baseEl.textContent = yuan(base);
-    discEl.textContent = "−" + yuan(disc);
-    totalEl.textContent = yuan(total);
+  function render() {
+    var p = computePlan();
 
-    if (disc > 0.001) {
+    baseEl.textContent = yuan(p.base);
+    discEl.textContent = "−" + yuan(p.disc);
+    totalEl.textContent = yuan(p.total);
+
+    if (p.disc > 0.001) {
       saveBox.hidden = false;
-      saveAmt.textContent = yuan(disc) +
-        (base > 0 ? "（省 " + (disc / base * 100).toFixed(0) + "%）" : "");
+      saveAmt.textContent = yuan(p.disc) +
+        (p.base > 0 ? "（省 " + (p.disc / p.base * 100).toFixed(0) + "%）" : "");
     } else {
       saveBox.hidden = true;
     }
 
-    ordersEl.innerHTML = orders.map(function (o) {
-      return '<li><span class="oh"><span>' + o.title + "</span><span>" + yuan(o.price) + "</span></span>" +
-             '<span class="od">' + o.detail + "</span></li>";
+    ordersEl.innerHTML = p.orders.map(function (o, i) {
+      return '<li><span class="oh"><span>单 ' + (i + 1) + " · " + esc(o.title) + "</span><span>" + yuan(o.price) + "</span></span>" +
+             '<span class="od">' + esc(o.detail) + "</span></li>";
     }).join("");
 
-    var needSplit = orders.length > 1;
+    var needSplit = p.orders.length > 1;
     warnBox.hidden = !needSplit;
     if (needSplit) {
       warnBox.innerHTML =
-        "🔀 <b>必须拆成 " + orders.length + " 单下。</b>「套餐」与「券」放同一单会被官方拒绝 " +
+        "🔀 <b>必须拆成 " + p.orders.length + " 单下。</b>「套餐」与「券」放同一单会被官方拒绝 " +
         "<code>600012</code>；每单也只能用一张券 <code>600022</code>。" +
-        "拆单后到手 <b>" + yuan(total) + "</b>。";
+        "拆单后到手 <b>" + yuan(p.total) + "</b>。";
     }
   }
 
   render();
+
+  /* ================= 云服务接入 ================= */
+  // publicConfig 由「开通云服务」返回，是唯一可以放进前端的值（publishableKey 本身不带权限，
+  // 服务端按精确 Origin 校验）。单文件页面无构建步骤，故以常量的形式内置。
+  var PUBLIC_CONFIG = {
+    endpoint: "https://mcd-money-saver.app.workbuddy.host",
+    oauthRelayBaseUrl: "https://www.workbuddy.cn/v2/as/genie-baas/oauth",
+    publishableKey: "wbpk_OmkkZSoB5aPesrbMH2T40u_qXDIZxdTpIgQpoqgtPpHJHhlYHITjsvD"
+  };
+  var STORE_CODE = "1420621";
+  var TABLE = "saving_plans";
+
+  var cloud = null, cloudError = null;
+  try {
+    if (typeof WorkBuddyCloud === "undefined" || typeof WorkBuddyCloud.createWorkBuddyCloud !== "function") {
+      throw new Error("云服务 SDK 未加载（CDN 不可达）");
+    }
+    cloud = WorkBuddyCloud.createWorkBuddyCloud({
+      endpoint: PUBLIC_CONFIG.endpoint,
+      oauthRelayBaseUrl: PUBLIC_CONFIG.oauthRelayBaseUrl,
+      publishableKey: PUBLIC_CONFIG.publishableKey
+    });
+  } catch (e) {
+    cloudError = e;
+  }
+
+  // ---- 失败路径统一给出可读信息（不静默失败、不打印原始行/令牌）----
+  function friendlyError(err) {
+    if (!err) return "未知错误";
+    if (err.error && err.error.code) {
+      var c = String(err.error.code);
+      if (c.indexOf("auth_") === 0) return "云凭证或域名校验失败（" + c + "），请刷新页面重试。";
+      if (c.indexOf("quota_") === 0) return "云端额度已用尽或触发限流（" + c + "），请稍后再试。";
+      if (c.indexOf("request_") === 0) return "请求参数不被接受（" + c + "）。";
+      if (c.indexOf("gateway_") === 0 || c.indexOf("model_") === 0) return "模型服务暂时不可用（" + c + "），请稍后重试。";
+      return "云端错误（" + c + "）" + (err.requestId ? " · " + err.requestId : "");
+    }
+    if (err.code === "42P01") return "数据表不存在（42P01）：云数据库尚未初始化。";
+    if (err.code === "42501") return "无权限（42501）：表未授权或行策略拒绝。";
+    if (err.code === "23505") return "记录重复（23505）。";
+    if (err.code === "23514") return "字段校验未通过（23514）：昵称长度或金额不合法。";
+    if (err.message) return err.message;
+    return String(err);
+  }
+
+  var cloudPill = document.getElementById("cloudPill");
+  var cloudDot = document.getElementById("cloudDot");
+  function setCloudState(ok, text) {
+    if (!cloudPill) return;
+    cloudPill.className = "pill" + (ok ? "" : " off");
+    cloudDot.textContent = ok ? "●" : "○";
+    cloudPill.innerHTML = '<span id="cloudDot">' + (ok ? "●" : "○") + "</span> " + esc(text);
+    cloudPill.className = "pill" + (ok ? "" : " off");
+  }
+
+  /* ---- 数据库：写入方案 ---- */
+  async function savePlan(nick, note) {
+    if (!cloud) throw new Error("云服务未就绪：" + (cloudError ? cloudError.message : "SDK 未初始化"));
+    var p = computePlan();
+    if (p.picked.length === 0) throw new Error("先勾选至少一件商品，再保存");
+
+    var name = String(nick || "").trim() || "匿名麦友";
+    if (name.length > 12) name = name.slice(0, 12);
+
+    // owner 由服务端决定；本表为公开省钱墙，不设 owner 列，故客户端不传任何身份字段
+    var row = {
+      nickname: name,
+      store_code: STORE_CODE,
+      item_ids: p.picked.map(function (m) { return m.id; }),
+      item_names: p.picked.map(function (m) { return m.name; }).join("、"),
+      base_price: Number(p.base.toFixed(2)),
+      final_price: Number(p.total.toFixed(2)),
+      saved: Number(p.disc.toFixed(2)),
+      order_count: p.orders.length
+    };
+    var n = String(note || "").trim();
+    if (n) row.note = n.slice(0, 200);   // 空则整字段省略，不用 null 覆盖默认值
+
+    var res = await cloud.database.from(TABLE).insert(row).select();
+    if (res.error) throw res.error;
+    var created = res.data && res.data[0];
+    if (!created) throw new Error("写入未返回数据（可能被行级策略拒绝）");
+    return created;
+  }
+
+  /* ---- 数据库：读取最新方案 ---- */
+  async function loadWall(limit) {
+    if (!cloud) throw new Error("云服务未就绪");
+    var res = await cloud.database
+      .from(TABLE)
+      .select("id, nickname, item_names, final_price, saved, order_count, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit || 12);
+    if (res.error) throw res.error;
+    return res.data || [];
+  }
+
+  /* ---- 数据库：RPC 聚合榜 ---- */
+  async function loadLeaderboard(top) {
+    if (!cloud) throw new Error("云服务未就绪");
+    var res = await cloud.database.rpc("saving_leaderboard", { limit_n: top || 8 });
+    if (res.error) throw res.error;
+    return res.data || [];
+  }
+
+  /* ---- 数据库：总览统计 ---- */
+  async function loadStats() {
+    if (!cloud) throw new Error("云服务未就绪");
+    var c = await cloud.database.from(TABLE).select("*", { count: "exact", head: true });
+    if (c.error) throw c.error;
+    var lb = await loadLeaderboard(50);
+    var sum = lb.reduce(function (s, r) { return s + Number(r.total_saved || 0); }, 0);
+    return { count: Number(c.count || 0), saved: sum };
+  }
+
+  /* ---- 云端大模型：AI 配单 ---- */
+  var AI_PREFER = ["glm-5.3-flash", "deepseek-v4.1-flash", "hy3", "glm-4.6", "hunyuan-2.0-thinking", "auto"];
+
+  function extractJson(text) {
+    if (!text) return null;
+    var m = String(text).match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try { return JSON.parse(m[0]); }
+    catch (e) {
+      try { return JSON.parse(m[0].replace(/,\s*([}\]])/g, "$1")); } catch (e2) { return null; }
+    }
+  }
+
+  async function pickModel() {
+    var models = await cloud.llm.models.list();
+    if (!Array.isArray(models) || models.length === 0) {
+      throw new Error("当前应用没有可用模型（模型目录为空）");
+    }
+    var usable = models.filter(function (m) { return m.disabled !== true && m.enabled !== false; });
+    if (usable.length === 0) throw new Error("模型目录里没有启用的模型");
+    for (var i = 0; i < AI_PREFER.length; i++) {
+      for (var j = 0; j < usable.length; j++) {
+        if (usable[j].id === AI_PREFER[i]) return usable[j];
+      }
+    }
+    return usable[0];
+  }
+
+  async function aiPick(need, onToken) {
+    if (!cloud) throw new Error("云服务未就绪");
+    need = String(need || "").trim().slice(0, 60);
+    if (!need) throw new Error("先用一句话说说你想吃什么");
+
+    var model = await pickModel();
+
+    var menuText = MENU.map(function (m) {
+      return "- " + m.id + " | " + m.name + " | 到手 " + yuan(m.price) + " | 原价 " + yuan(m.alaCarte) + " | " + m.tag;
+    }).join("\n");
+    // system 必须是 messages[0]，且不掺入任何用户输入（防提示注入改写指令）
+    var system = [
+      "你是麦当劳点单助手，只能从下面给定的商品里挑选，不得编造商品、价格或优惠。",
+      "根据用户需求，从候选中挑出最合适的组合（1~4 个），并给出简短理由。",
+      '只输出一个 JSON 对象，形如 {"ids":["combo","amer"],"reason":"不超过40字的中文理由"}，不要输出任何其它文字。',
+      "可选商品：",
+      menuText
+    ].join("\n");
+
+    async function run(useJsonFormat) {
+      var acc = "", reasoning = "";
+      var params = {
+        model: model.id,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: "我的需求：" + need }
+        ],
+        stream: true,
+        temperature: 1
+      };
+      if (useJsonFormat) params.response_format = { type: "json_object" };
+
+      for await (const chunk of cloud.llm.chat.completions.create(params)) {
+        var d = chunk.choices && chunk.choices[0] && chunk.choices[0].delta;
+        if (d && d.content) { acc += d.content; if (onToken) onToken(acc); }
+        if (d && d.reasoning_content) reasoning += d.reasoning_content;  // 思考内容单独累积，不混入回复
+      }
+      return { acc: acc, reasoning: reasoning };
+    }
+
+    var out;
+    try {
+      out = await run(true);
+    } catch (e) {
+      var code = (e && e.error && e.error.code) || "";
+      if (String(code).indexOf("request_") === 0) {
+        out = await run(false);   // 该模型不支持 response_format，退回普通流式
+      } else { throw e; }
+    }
+
+    var json = extractJson(out.acc) || extractJson(out.reasoning);
+    if (!json) throw new Error("模型未返回可解析的 JSON：" + String(out.acc || out.reasoning || "").slice(0, 80));
+
+    var valid = MENU.map(function (m) { return m.id; });
+    var ids = (Array.isArray(json.ids) ? json.ids : []).filter(function (id) { return valid.indexOf(id) >= 0; });
+    if (ids.length === 0) ids = [MENU[0].id];   // 模型乱答时兜底到第一个商品，绝不返回非法 id
+
+    return { modelId: model.id, ids: ids, reason: String(json.reason || "").slice(0, 80) };
+  }
+
+  /* ================= 省钱墙 UI ================= */
+  var nickEl = document.getElementById("nick");
+  var saveBtn = document.getElementById("saveBtn");
+  var saveMsg = document.getElementById("saveMsg");
+  var wallList = document.getElementById("wallList");
+  var rankList = document.getElementById("rankList");
+  var statCount = document.getElementById("statCount");
+  var statSaved = document.getElementById("statSaved");
+  var statEnv = document.getElementById("statEnv");
+
+  function setMsg(el, text, ok) {
+    el.textContent = text || "";
+    el.className = "msg tiny" + (text ? (ok ? " ok" : " bad") : "");
+  }
+
+  async function refreshWall() {
+    if (!cloud) {
+      wallList.innerHTML = '<li class="tiny">云服务未连接：' + esc(cloudError ? friendlyError(cloudError) : "SDK 未加载") + "</li>";
+      rankList.innerHTML = '<li class="tiny" style="border:none;background:none">不可用</li>';
+      statCount.textContent = "–"; statSaved.textContent = "–"; statEnv.textContent = "未连接";
+      setCloudState(false, "云服务未连接");
+      return;
+    }
+    setCloudState(true, "云服务已连接");
+    statEnv.textContent = "已连接";
+
+    try {
+      var rows = await loadWall(12);
+      if (rows.length === 0) {
+        wallList.innerHTML = '<li class="tiny">还没有人保存方案，做一个第一吧 👆</li>';
+      } else {
+        wallList.innerHTML = rows.map(function (r) {
+          return "<li>" +
+            '<span class="wh"><span>' + esc(r.nickname) + " 的方案</span>" +
+              '<span style="color:var(--gold)">' + yuan(r.final_price) + "</span></span>" +
+            '<span class="wa">' + esc(r.item_names || "") + "</span>" +
+            '<span class="wm"><span>省 ' + yuan(r.saved) + "</span><span>拆 " + esc(r.order_count) +
+              " 单</span><span>" + esc(fmtTime(r.created_at)) + "</span></span>" +
+            "</li>";
+        }).join("");
+      }
+    } catch (e) {
+      wallList.innerHTML = '<li class="tiny">读取失败：' + esc(friendlyError(e)) + "</li>";
+    }
+
+    try {
+      var lb = await loadLeaderboard(8);
+      if (lb.length === 0) {
+        rankList.innerHTML = '<li class="tiny" style="border:none;background:none">暂无数据</li>';
+      } else {
+        rankList.innerHTML = lb.map(function (r, i) {
+          return '<li><span class="no">' + (i + 1) + '</span><span class="nm">' + esc(r.nickname) +
+            '</span><span class="tiny">×' + esc(r.plans) + '</span><span class="sv">省 ' + yuan(r.total_saved) + "</span></li>";
+        }).join("");
+      }
+    } catch (e) {
+      rankList.innerHTML = '<li class="tiny" style="border:none;background:none">聚合失败</li>';
+    }
+
+    try {
+      var st = await loadStats();
+      statCount.textContent = st.count + " 条";
+      statSaved.textContent = yuan(st.saved);
+    } catch (e) {
+      statCount.textContent = "–"; statSaved.textContent = "–";
+    }
+  }
+
+  var lastSave = 0;
+  saveBtn.addEventListener("click", async function () {
+    var now = Date.now();
+    if (now - lastSave < 5000) { setMsg(saveMsg, "慢一点，5 秒后再试", false); return; }
+    lastSave = now;
+    saveBtn.disabled = true;
+    setMsg(saveMsg, "保存中…", true);
+    try {
+      var created = await savePlan(nickEl.value, "");
+      setMsg(saveMsg, "已保存 ✔（id " + created.id + "，到手 " + yuan(created.final_price) + "）", true);
+      await refreshWall();
+    } catch (e) {
+      setMsg(saveMsg, "保存失败：" + friendlyError(e), false);
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+
+  /* ================= AI 配单 UI ================= */
+  var aiNeed = document.getElementById("aiNeed");
+  var aiBtn = document.getElementById("aiBtn");
+  var aiOut = document.getElementById("aiOut");
+  var aiModel = document.getElementById("aiModel");
+  var lastAi = 0;
+
+  aiBtn.addEventListener("click", async function () {
+    var now = Date.now();
+    if (now - lastAi < 8000) { aiOut.hidden = false; aiOut.innerHTML = '<span class="err">慢一点，8 秒后再试</span>'; return; }
+    lastAi = now;
+    aiBtn.disabled = true;
+    aiOut.hidden = false;
+    aiOut.innerHTML = '<span class="spin"></span> 正在让云端大模型挑搭配…';
+    try {
+      var r = await aiPick(aiNeed.value);
+      setSelection(r.ids);
+      aiModel.textContent = "模型：" + r.modelId;
+      aiOut.innerHTML = "🤖 <b>" + esc(r.reason || "给你配好了") + "</b><br>" +
+        '<span class="tiny">已自动勾选：' + esc(r.ids.join("、")) + " · " + esc(r.modelId) + "</span>";
+    } catch (e) {
+      aiOut.innerHTML = '<span class="err">生成失败：' + esc(friendlyError(e)) + "</span>";
+    } finally {
+      aiBtn.disabled = false;
+    }
+  });
+
+  /* ================= 云服务自检（?selfcheck=1）================= */
+  async function selfcheck() {
+    var steps = [];
+    function add(name, ok, detail) { steps.push({ name: name, ok: !!ok, detail: detail == null ? "" : String(detail) }); }
+
+    add("云服务 SDK 初始化", !!cloud, cloud ? PUBLIC_CONFIG.endpoint : (cloudError && cloudError.message));
+    if (!cloud) return finish();
+
+    try {
+      var models = await cloud.llm.models.list();
+      add("模型目录可用", Array.isArray(models) && models.length > 0,
+        "共 " + ((models && models.length) || 0) + " 个模型");
+    } catch (e) { add("模型目录可用", false, friendlyError(e)); }
+
+    var created = null;
+    try {
+      created = await savePlan("自检·系统", "cloud selfcheck");
+      add("写入方案（INSERT）", !!(created && created.id != null),
+        created ? "id=" + created.id + " · 到手 " + yuan(created.final_price) : "未返回数据行");
+    } catch (e) { add("写入方案（INSERT）", false, friendlyError(e)); }
+
+    try {
+      var wall = await loadWall(5);
+      var found = !!created && wall.some(function (r) { return r.id === created.id; });
+      add("读回校验（SELECT）", found, "最新 5 条中" + (found ? "找到刚写入的行" : "未找到刚写入的行"));
+    } catch (e) { add("读回校验（SELECT）", false, friendlyError(e)); }
+
+    try {
+      var lb = await loadLeaderboard(5);
+      add("聚合榜（RPC）", Array.isArray(lb), "返回 " + ((lb && lb.length) || 0) + " 组");
+    } catch (e) { add("聚合榜（RPC）", false, friendlyError(e)); }
+
+    try {
+      var ai = await aiPick("想喝咖啡配个堡，预算 40 以内");
+      add("AI 点单建议（LLM 流式）", !!(ai && ai.ids && ai.ids.length),
+        ai.modelId + " → [" + ai.ids.join(",") + "] · " + ai.reason);
+    } catch (e) { add("AI 点单建议（LLM 流式）", false, friendlyError(e)); }
+
+    try {
+      var st = await loadStats();
+      add("统计口径（count + 聚合）", st.count >= 0, "共 " + st.count + " 条 · 累计省 " + yuan(st.saved));
+    } catch (e) { add("统计口径（count + 聚合）", false, friendlyError(e)); }
+
+    return finish();
+
+    function finish() {
+      return {
+        ok: steps.every(function (s) { return s.ok; }),
+        endpoint: PUBLIC_CONFIG.endpoint,
+        at: new Date().toISOString(),
+        steps: steps
+      };
+    }
+  }
+
+  // 供真机验证 / 故障排查使用
+  window.__mcd = {
+    version: "2026-10-10-cloud",
+    selfcheck: selfcheck,
+    savePlan: savePlan,
+    loadWall: loadWall,
+    loadLeaderboard: loadLeaderboard,
+    loadStats: loadStats,
+    aiPick: aiPick,
+    computePlan: computePlan,
+    setSelection: setSelection,
+    hasCloud: function () { return !!cloud; },
+    menu: MENU
+  };
+
+  var params = new URLSearchParams(location.search);
+  if (params.get("selfcheck") === "1") {
+    var pre = document.createElement("pre");
+    pre.id = "selfcheckOut";
+    pre.textContent = "云服务自检运行中…";
+    document.querySelector(".wrap").appendChild(pre);
+    selfcheck().then(function (r) {
+      document.title = "selfcheck " + (r.ok ? "PASS" : "FAIL");
+      pre.textContent = JSON.stringify(r, null, 2);
+    });
+  } else {
+    refreshWall();
+  }
 })();
 </script>
 </body>
