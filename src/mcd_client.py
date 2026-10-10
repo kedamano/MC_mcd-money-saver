@@ -152,6 +152,76 @@ class McDonaldMCPClient:
         return self.call_tool("calculate-price", arguments)
 
     @staticmethod
+    def pick_take_way(price_data: Dict[str, Any], prefer: str = "take-in-store") -> Optional[str]:
+        """从 calculate-price 返回的 takeWayList 中选取取餐方式 code。
+
+        真实 observe：到店场景 calculate-price 返回
+        `takeWayList: [{"code":"eat-in","title":"堂食"},{"code":"take-in-store","title":"外带"}]`，
+        到店下单(create-order, orderType=1)必须传 takeWayCode，取值即此处的 code。
+        """
+        lst = (price_data or {}).get("takeWayList") or []
+        if not lst:
+            return None
+        codes = [x.get("code") for x in lst if isinstance(x, dict)]
+        if prefer in codes:
+            return prefer
+        return codes[0] if codes else None
+
+    def create_order(
+        self,
+        store_code: str,
+        items: List[Dict[str, Any]],
+        *,
+        take_way_code: Optional[str] = None,
+        order_type: int = 1,
+        be_type: int = 1,
+        need_tableware: bool = False,
+        address_id: Optional[str] = None,
+        remark: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """调用 create-order 创建订单（⚠️ 真实下单，会生成待支付订单）。
+
+        ⚠️ 安全提示：本方法会真实创建麦当劳订单并返回支付链接，**调用前必须经用户显式确认**。
+        到店(orderType=1) 必须提供 take_way_code（取自 calculate-price 的 takeWayList[].code）。
+
+        参数：
+            items: [{"product_code": "1100", "quantity": 1, "coupon_code"?: ..., "coupon_id"?: ...}, ...]
+        返回业务 data：含订单号 / 支付链接等。
+        """
+        priced_items = []
+        for it in items:
+            entry: Dict[str, Any] = {
+                "productCode": it["product_code"],
+                "quantity": it.get("quantity", 1),
+            }
+            if it.get("coupon_code"):
+                entry["couponCode"] = it["coupon_code"]
+            if it.get("coupon_id"):
+                entry["couponId"] = it["coupon_id"]
+            priced_items.append(entry)
+
+        arguments: Dict[str, Any] = {
+            "storeCode": store_code,
+            "orderType": order_type,
+            "beType": be_type,
+            "needTableware": need_tableware,
+            "items": priced_items,
+        }
+        if order_type == 1:
+            if not take_way_code:
+                raise ValueError(
+                    "到店(orderType=1)下单必须提供 take_way_code"
+                    "（取自 calculate-price 的 takeWayList[].code，可用 pick_take_way 获取）"
+                )
+            arguments["takeWayCode"] = take_way_code
+        else:
+            if address_id:
+                arguments["addressId"] = address_id
+            if remark:
+                arguments["remark"] = remark
+        return self.call_tool("create-order", arguments)
+
+    @staticmethod
     def price_combo_as_fn(store_code: str, order_type: int = 1, be_type: int = 1):
         """生成一个可直接作为 two_stage_optimize(pricing_fn=...) 的回调。
 
