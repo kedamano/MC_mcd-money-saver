@@ -30,6 +30,8 @@
 | FR-11 | 两阶段核价 | 本地求解 Top-K 候选（小券池暴力枚举、大券池分支限界），仅对 K 个调官方 `calculate-price` 取权威价（`two_stage_optimize`），规避 2^n 次调用；**默认每单至多一张券（`max_coupons_per_order=1`）**，与真实 MCP 规则一致 |
 | FR-12 | 生效时间与时段窗 | 按 `valid_from`（未生效）、每日 `time_windows`（如仅 05:00-23:59 可用，支持跨零点）与 `expires_at` 三重过滤（`filter_active_coupons`）|
 | FR-13 | 下单链路 | 到店下单须先由 `calculate-price` 取 `takeWayList[].code` 作为 `takeWayCode`，再调 `create-order`（`mcd_client.create_order` / `pick_take_way`）；须用户显式确认 |
+| FR-14 | 拆分下单 | 真实「每单至多一张券」下，把购物车拆成多单、每单配一张最优券，权衡每单配送费，求全局最低总价（`optimize_split_orders`）；无券/单券或拆分无收益时退化为单订单；`max_orders` 限制拆分规模；券不可跨单复用 |
+| FR-15 | 外送场景 | 外送链路：`delivery-create-address`（建地址）→ `delivery-query-stores`（取门店 `beCode`）→ `query-meals`/`query-store-coupons`/`calculate-price`（**全程必传 `beCode`**）。外送价 = 商品 + 配送费(`deliveryPrice`) + 打包服务费(`packingPrice`)；须校验券渠道（到店专用券外送不可用，`code=600012`）|
 
 ## 3. 真实业务规则（来自联调观测，具约束力）
 
@@ -39,6 +41,8 @@
 4. **叠加以服务器为准**：客户端约束（满减/折扣/立减·全单通用至多一张、类目券可叠加、免配送费券互斥）为**启发式剪枝**，最终是否生效由 `calculate-price` 决定。
 5. **到店 / 外送差异**：`beType=1` 到店不含 `beCode`；`beType=2` 外送含配送费与起送价，免配送费券在外送场景才有意义。
 6. **限流**：每分钟请求上限 600 次（429），禁止在循环中高频刷接口。
+7. **券有渠道限制**：标注「到店专用」的券用于外送核价返回 `code=600012「当前优惠券不可用！」`，到店正常生效；选券须校验 `orderType`。
+8. **外送全程必传 `beCode`**：外送(beType=2/5/6)下 `query-meals` / `query-store-coupons` / `calculate-price` 缺 `beCode` 均报 `code=600048`；`beCode` 来自 `delivery-query-stores`（须先 `delivery-create-address` 建地址）。外送商品 `code` 与到店不通用（到店下单报 `60006 不可售`）。外送价额外含 `deliveryPrice`/`packingPrice`，且折扣可能来自商品自身促销价而非券。
 
 ## 4. 非功能需求（NFR）
 
@@ -59,6 +63,9 @@
 | 规模单测 | `tests/test_scale_pruning.py` | 大规模券剪枝 + 分支限界：与暴力枚举同解（40 组随机种子）、0 优惠券剪枝安全性、约束一致性、剪枝节点压缩 |
 | Top-K 单测 | `tests/test_topk_pruning.py` | `rank_candidates` 的 Top-K 分支限界：与暴力枚举同值（40 组随机种子 × K∈{1,3,5}）、K 名上界剪枝、大券池可用性 |
 | 券数上限单测 | `tests/test_one_coupon_rule.py` | 真实规则「每单至多一张券」：默认保留组合能力、`max_coupons_per_order=1` 时暴力/分支限界同解、Top-K 候选与 `two_stage_optimize` 均遵守上限 |
+| 拆分下单单测 | `tests/test_split_orders.py` | `optimize_split_orders`：无券/单券不拆、多绑定券到店拆单更省、外送配送费阻碍拆单、券不跨单复用、`max_orders` 限制、与暴力划分基准同值（30 组随机） |
+| 外送链路单测 | `tests/test_delivery.py` | 外送请求体构造：`price_combo`/`create_order` 的 `beCode`、`addressId`、`takeWayCode` 分支与副作用调用禁用重试 |
+| 外送合同测试 | `tests/test_delivery_contract.py` | 外送真实返回契约：价格构成（商品+配送+打包−折扣）、打包费独立零小计行、折扣来自商品促销、券渠道限制 `600012` |
 | 合同测试 | `tests/test_real_contract.py` | 基于真实 `calculate-price` 返回，断言客户端模型与服务器一致 |
 | 真实校准 | `tests/test_live_calibration.py`（`-m live`） | 用真实返回值校准本地价格模型与官方一致 |
 | 真实冒烟 | `tests/test_mcd_client.py::test_live_end_to_end`（`-m live`） | 真实连接完成 `initialize→list_tools→call_tool`，默认跳过 |
@@ -66,7 +73,7 @@
 
 运行：
 ```bash
-python -m pytest tests/ -q                 # 离线：68 例全过
+python -m pytest tests/ -q                 # 离线：90 例全过
 MCD_MCP_TOKEN=xxx pytest -m live -q        # 真实端到端（可选，4 例 live）
 python examples/demo_smart.py              # B/C/D/E 离线演示
 MCD_MCP_TOKEN=xxx python examples/demo_live.py           # 真实端到端演示（选店→三池→官方核价）
@@ -90,6 +97,8 @@ MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 真实官方核价�
 | **C2** | 大规模券剪枝 + 分支限界：券数 >16 自动切 B&B（先剔 0 优惠券，再按乐观上界剪枝），与暴力枚举**同解**；实测 n=20 提速 ~260× | `coupon_optimizer._optimal_subset_bnb` / `_prune_zero_value` / `optimize_coupons(strategy=...)` | ✅ |
 | **C3** | Top-K 候选分支限界：`rank_candidates` 用「大小为 K 的最小堆 + 第 K 名上界剪枝」代替全枚举，与暴力枚举**同值**；实测 n=18 提速 ~180× | `coupon_optimizer._rank_candidates_bnb` / `rank_candidates(strategy=...)` | ✅ |
 | **C4** | 真实规则「每单至多一张券」：真机实测传两张券返回 `code=600022「暂不支持多张券使用」`，优化器新增 `max_coupons_per_order`（真实核价路径默认 1），暴力/分支限界/两阶段一致遵守 | `coupon_optimizer.optimize_coupons` / `rank_candidates` / `coupon_smart.two_stage_optimize` | ✅ |
+| **F1** | 拆分下单：真实「每单一张券」下把购物车拆成多单、每单配一张最优券，权衡外送配送费求全局最低价；与暴力划分基准同值 | `coupon_optimizer.optimize_split_orders` / `_assign_best` / `_partitions` | ✅ |
+| **F2** | 外送场景：`price_combo`/`create_order` 支持 `beCode`，新增地址/外送门店封装；外送配送费+打包费建模与券渠道限制契约 | `mcd_client.price_combo` / `query_delivery_stores` / `create_delivery_address` | ✅ |
 
 > **关键 Bug 修复（真机联调发现，均补了回归测试）**：
 > 1. `calculate-price` 返回 `{success,code,message,data:{...}}`，需拆到最内层 `data`，否则取到 `price=None` 核价归零；
