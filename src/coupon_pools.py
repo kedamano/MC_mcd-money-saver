@@ -29,6 +29,23 @@ _RE_MY_TAG = re.compile(r"\*\*标签\*\*:\s*(.+)")
 _RE_IMG = re.compile(r'<img src="([^"]+)"')
 _RE_CID_IN_IMG = re.compile(r"/([0-9A-Fa-f]{32})\.png")
 _RE_DATE = re.compile(r"(\d{4}-\d{2}-\d{2})")
+_RE_TIME_WINDOW = re.compile(r"(\d{1,2}:\d{2})-(\d{1,2}:\d{2})")
+
+
+def parse_valid_period(text: str):
+    """解析有效期字符串 -> (valid_from, expires_at, time_windows)。
+
+    真实 observe：我的券有效期形如
+        "2026-10-10 00:00-2026-11-08 23:59 05:00-23:59"
+    即「起-止日期」+「每日可用时段(05:00-23:59)」。
+    日期取前两个；末段 HH:MM-HH:MM 为每日时段窗。
+    """
+    t = text or ""
+    dates = _RE_DATE.findall(t)
+    windows = [(s, e) for s, e in _RE_TIME_WINDOW.findall(t)]
+    valid_from = dates[0] if dates else None
+    expires_at = dates[1] if len(dates) > 1 else (dates[0] if dates else None)
+    return valid_from, expires_at, windows
 
 
 def parse_my_coupons_text(text: str) -> List[Dict[str, Any]]:
@@ -58,18 +75,16 @@ def parse_my_coupons_text(text: str) -> List[Dict[str, Any]]:
             m = _RE_CID_IN_IMG.search(image)
             if m:
                 cid = m.group(1).upper()
-        # 有效期形如 "2026-10-10 00:00-2026-11-08 23:59 05:00-23:59"，取最后一个日期为失效日
-        expires_at = None
-        if valid:
-            dates = _RE_DATE.findall(valid)
-            if dates:
-                expires_at = dates[-1]
+        # 有效期形如 "2026-10-10 00:00-2026-11-08 23:59 05:00-23:59"
+        valid_from, expires_at, windows = parse_valid_period(valid)
         out.append(
             {
                 "name": name,
                 "price_text": price,
                 "valid_period": valid,
+                "valid_from": valid_from,
                 "expires_at": expires_at,
+                "time_windows": windows,
                 "tag": tag,
                 "image": image,
                 "coupon_id": cid,
