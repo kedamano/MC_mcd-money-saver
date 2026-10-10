@@ -159,6 +159,7 @@ def two_stage_optimize(
     delivery_fee: float = 0.0,
     pricing_fn: Optional[Callable[[List[Coupon], List[Item]], float]] = None,
     top_k: int = 3,
+    max_coupons_per_order: Optional[int] = 1,
 ) -> dict:
     """本地粗排 Top-K + 仅对 Top-K 调官方核价，返回权威最优方案。
 
@@ -166,6 +167,10 @@ def two_stage_optimize(
         pricing_fn: 官方核价回调，签名 (subset_coupons: List[Coupon], items) -> 权威总价(float)。
                     为 None 时退化为纯本地最优（不联网）。
         top_k:      进入官方核价阶段的候选数量上限。
+        max_coupons_per_order: 每单最大券数。**默认 1**：真实麦当劳 MCP 实测
+                    每单仅支持一张券（传两张返回 code=600022「暂不支持多张券使用」），
+                    故本地粗排也必须遵守，否则会排出官方必然拒绝的组合。
+                    传 None 可关闭该限制。
 
     返回：
         {
@@ -178,7 +183,10 @@ def two_stage_optimize(
         }
     """
     original_total = total_price(items, delivery_fee)
-    candidates = rank_candidates(items, coupons, delivery_fee, top_k=top_k)
+    candidates = rank_candidates(
+        items, coupons, delivery_fee, top_k=top_k,
+        max_coupons_per_order=max_coupons_per_order,
+    )
 
     if pricing_fn is None or not candidates:
         best = candidates[0] if candidates else {
