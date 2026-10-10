@@ -86,9 +86,17 @@ print(optimize_coupons(items, coupons, delivery_fee=6.0))
 将返回金额与优化器 `best_total` 对照。**以 `calculate-price` 官方结果为准**；
 若不一致，向用户说明差异（如某些券实际不可叠加/已过期）。
 
-### 6. 确认后下单
+### 6. 确认后下单（两阶段，注意取餐方式依赖）
 向用户展示："原价 X，用券后 Y，省 Z，组合为 …… 是否下单？"
-用户确认后调用 `create-order` 获取支付链接；随后可用 `query-order` 核对。
+用户确认后：
+1. **先取取餐方式**：到店场景 `calculate-price` 返回 `takeWayList`
+   （如 `[{"code":"eat-in","title":"堂食"},{"code":"take-in-store","title":"外带"}]`），
+   选一个 `code` 作为 `takeWayCode`（用 `McDonaldMCPClient.pick_take_way` 获取）；
+2. 调用 `create-order`（到店 `orderType=1` 必传 `takeWayCode`；外送 `orderType=2` 传 `addressId`），
+   接口实现见 `src/mcd_client.py` 的 `create_order`；
+3. 返回支付链接后引导用户支付，再用 `query-order` 核对订单状态。
+
+> ⚠️ **`create-order` 是真实下单**：务必在用户**显式确认**后再调用，避免误产生待支付订单。
 
 ## 约束与边界
 
