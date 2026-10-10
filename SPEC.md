@@ -81,7 +81,7 @@ MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 真实官方核价�
 | **A1** | 三池聚合：门店券(JSON)/我的券/麦麦省券(Markdown) 分别解析、按券名去重、标注可领取扩池 | `coupon_pools.collect_coupon_pools` / `parse_my_coupons_text` / `parse_available_coupons_text` | ✅ |
 | **A2** | 下单链路：到店先取 `takeWayList[].code` 作 `takeWayCode`，再 `create-order`；受保护默认不真下单 | `mcd_client.create_order` / `pick_take_way` | ✅ |
 | **B1** | 生效时间/时段窗：`valid_from` + 每日 `time_windows`（支持跨零点）+ `expires_at` 三重过滤 | `coupon_optimizer.filter_active_coupons` / `Coupon.valid_from` / `time_windows` | ✅ |
-| **D1** | CI 绿徽章：每次 push 自动跑离线测试 | `.github/workflows/ci.yml` | ⏳（需仓库 `workflow` 权限推送）|
+| **D1** | CI 绿徽章：每次 push 自动跑离线测试（Py3.11/3.13 矩阵） | `.github/workflows/ci.yml` | ✅（已推送，首次运行 success）|
 | **D2** | 真实核价 demo + 文档 | `examples/demo_live.py` / `DEMO.md` | ✅ |
 | **C1** | 健壮性：瞬时错误(404/5xx/429)指数退避重试 + 熔断（副作用调用禁用重试）；读接口 TTL 缓存；环境自检脚本 | `mcd_client._post`/`call_tool_cached` / `scripts/doctor.py` | ✅ |
 
