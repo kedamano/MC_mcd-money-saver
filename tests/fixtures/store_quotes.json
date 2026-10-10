@@ -1,0 +1,287 @@
+[
+  {
+    "store_code": "1450104",
+    "store_name": "麦当劳上海黄浦悦荟广场餐厅",
+    "distance_m": 194,
+    "prices": {
+      "4810": {
+        "name": "薯条",
+        "price": 13.5
+      },
+      "520689": {
+        "name": "鲜萃咖啡",
+        "price": 9.5
+      }
+    },
+    "n_store_coupons": 3,
+    "coupons": [
+      {
+        "title": "9.9元中杯冰美式",
+        "couponId": "264B97DBE02BE6CF996AA6914151C4A9",
+        "couponCode": "MCD618Y0006V0815Z3910",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-10-16 23:59:59",
+        "products": [
+          {
+            "productCode": "507411",
+            "productName": "麦咖啡™冰美式中杯"
+          }
+        ],
+        "promotionId": "112023002"
+      },
+      {
+        "title": "新人专享-中杯美式7折",
+        "couponId": "365A627ABDC435D840984F03055DF097",
+        "couponCode": "MCD689H051J0J01C0Y078",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-11-08 23:59:59",
+        "products": [
+          {
+            "productCode": "9900000119",
+            "productName": "美式中杯"
+          }
+        ],
+        "promotionId": "110961005"
+      },
+      {
+        "title": "新人专享-中杯奶铁7折",
+        "couponId": "54573C230294E24F154414A1EE2949CD",
+        "couponCode": "MCD68J540100490MHY1C0",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-11-08 23:59:59",
+        "products": [
+          {
+            "productCode": "9900000117",
+            "productName": "奶铁中杯"
+          }
+        ],
+        "promotionId": "110961004"
+      }
+    ]
+  },
+  {
+    "store_code": "1450449",
+    "store_name": "麦当劳上海黄浦恒基名人购物中心餐厅",
+    "distance_m": 230,
+    "prices": {
+      "4810": {
+        "name": "薯条",
+        "price": 13.5
+      },
+      "520689": {
+        "name": "鲜萃咖啡",
+        "price": 9.5
+      }
+    },
+    "n_store_coupons": 3,
+    "coupons": [
+      {
+        "title": "9.9元中杯冰美式",
+        "couponId": "264B97DBE02BE6CF996AA6914151C4A9",
+        "couponCode": "MCD618Y0006V0815Z3910",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-10-16 23:59:59",
+        "products": [
+          {
+            "productCode": "507411",
+            "productName": "麦咖啡™冰美式中杯"
+          }
+        ],
+        "promotionId": "112023002"
+      },
+      {
+        "title": "新人专享-中杯美式7折",
+        "couponId": "365A627ABDC435D840984F03055DF097",
+        "couponCode": "MCD689H051J0J01C0Y078",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-11-08 23:59:59",
+        "products": [
+          {
+            "productCode": "9900000119",
+            "productName": "美式中杯"
+          }
+        ],
+        "promotionId": "110961005"
+      },
+      {
+        "title": "新人专享-中杯奶铁7折",
+        "couponId": "54573C230294E24F154414A1EE2949CD",
+        "couponCode": "MCD68J540100490MHY1C0",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-11-08 23:59:59",
+        "products": [
+          {
+            "productCode": "9900000117",
+            "productName": "奶铁中杯"
+          }
+        ],
+        "promotionId": "110961004"
+      }
+    ]
+  },
+  {
+    "store_code": "1450556",
+    "store_name": "麦当劳上海黄浦区福州路上海书城餐厅",
+    "distance_m": 325,
+    "prices": {
+      "4810": {
+        "name": "薯条",
+        "price": 13.5
+      },
+      "520689": {
+        "name": "鲜萃咖啡",
+        "price": 9.5
+      }
+    },
+    "n_store_coupons": 3,
+    "coupons": [
+      {
+        "title": "9.9元中杯冰美式",
+        "couponId": "264B97DBE02BE6CF996AA6914151C4A9",
+        "couponCode": "MCD618Y0006V0815Z3910",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-10-16 23:59:59",
+        "products": [
+          {
+            "productCode": "507411",
+            "productName": "麦咖啡™冰美式中杯"
+          }
+        ],
+        "promotionId": "112023002"
+      },
+      {
+        "title": "新人专享-中杯美式7折",
+        "couponId": "365A627ABDC435D840984F03055DF097",
+        "couponCode": "MCD689H051J0J01C0Y078",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-11-08 23:59:59",
+        "products": [
+          {
+            "productCode": "9900000119",
+            "productName": "美式中杯"
+          }
+        ],
+        "promotionId": "110961005"
+      },
+      {
+        "title": "新人专享-中杯奶铁7折",
+        "couponId": "54573C230294E24F154414A1EE2949CD",
+        "couponCode": "MCD68J540100490MHY1C0",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-11-08 23:59:59",
+        "products": [
+          {
+            "productCode": "9900000117",
+            "productName": "奶铁中杯"
+          }
+        ],
+        "promotionId": "110961004"
+      }
+    ]
+  },
+  {
+    "store_code": "1450056",
+    "store_name": "麦当劳上海食品一店餐厅",
+    "distance_m": 496,
+    "prices": {
+      "4810": {
+        "name": "薯条",
+        "price": 14.5
+      },
+      "520689": {
+        "name": "鲜萃咖啡",
+        "price": 9.5
+      }
+    },
+    "n_store_coupons": 3,
+    "coupons": [
+      {
+        "title": "9.9元中杯冰美式",
+        "couponId": "264B97DBE02BE6CF996AA6914151C4A9",
+        "couponCode": "MCD618Y0006V0815Z3910",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-10-16 23:59:59",
+        "products": [
+          {
+            "productCode": "507411",
+            "productName": "麦咖啡™冰美式中杯"
+          }
+        ],
+        "promotionId": "112023002"
+      },
+      {
+        "title": "新人专享-中杯美式7折",
+        "couponId": "365A627ABDC435D840984F03055DF097",
+        "couponCode": "MCD689H051J0J01C0Y078",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-11-08 23:59:59",
+        "products": [
+          {
+            "productCode": "9900000119",
+            "productName": "美式中杯"
+          }
+        ],
+        "promotionId": "110961005"
+      },
+      {
+        "title": "新人专享-中杯奶铁7折",
+        "couponId": "54573C230294E24F154414A1EE2949CD",
+        "couponCode": "MCD68J540100490MHY1C0",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-11-08 23:59:59",
+        "products": [
+          {
+            "productCode": "9900000117",
+            "productName": "奶铁中杯"
+          }
+        ],
+        "promotionId": "110961004"
+      }
+    ]
+  },
+  {
+    "store_code": "1450441",
+    "store_name": "麦当劳上海福州路餐厅",
+    "distance_m": 603,
+    "prices": {
+      "4810": {
+        "name": "薯条",
+        "price": 13.5
+      },
+      "520689": {
+        "name": "鲜萃咖啡",
+        "price": 9.5
+      }
+    },
+    "n_store_coupons": 3,
+    "coupons": [
+      {
+        "title": "9.9元中杯冰美式",
+        "couponId": "264B97DBE02BE6CF996AA6914151C4A9",
+        "couponCode": "MCD618Y0006V0815Z3910",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-10-16 23:59:59",
+        "products": [
+          {
+            "productCode": "507411",
+            "productName": "麦咖啡™冰美式中杯"
+          }
+        ],
+        "promotionId": "112023002"
+      },
+      {
+        "title": "新人专享-中杯美式7折",
+        "couponId": "365A627ABDC435D840984F03055DF097",
+        "couponCode": "MCD689H051J0J01C0Y078",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-11-08 23:59:59",
+        "products": [
+          {
+            "productCode": "9900000119",
+            "productName": "美式中杯"
+          }
+        ],
+        "promotionId": "110961005"
+      },
+      {
+        "title": "新人专享-中杯奶铁7折",
+        "couponId": "54573C230294E24F154414A1EE2949CD",
+        "couponCode": "MCD68J540100490MHY1C0",
+        "tradeDateTime": "2026-10-10 00:00:00-2026-11-08 23:59:59",
+        "products": [
+          {
+            "productCode": "9900000117",
+            "productName": "奶铁中杯"
+          }
+        ],
+        "promotionId": "110961004"
+      }
+    ]
+  }
+]
