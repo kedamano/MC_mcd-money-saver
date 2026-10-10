@@ -43,7 +43,9 @@ class StoreQuote:
     delivery_fee: float = 0.0
 
 
-def coupon_from_store_json(j: dict, price_map: Dict[str, float]) -> Optional[Coupon]:
+def coupon_from_store_json(
+    j: dict, price_map: Dict[str, float], channel: Optional[str] = None
+) -> Optional[Coupon]:
     """把门店券 JSON 转成优化器 Coupon（按标题推断券型）。
 
     可识别：
@@ -52,6 +54,10 @@ def coupon_from_store_json(j: dict, price_map: Dict[str, float]) -> Optional[Cou
       - "满60减12"     → threshold
       - "立减5元"      → fixed
     券绑定 products[].productCode；无法识别或无绑定商品时返回 None。
+
+    channel: 该券的适用渠道（到店 CHANNEL_DINE_IN / 外送 CHANNEL_DELIVERY）。
+    真实观察：门店券 JSON 本身不带渠道字段，渠道由**查询入口**决定
+    （`query-store-coupons` 按 orderType/beType 分渠道返回），故由调用方传入。
     """
     title = (j.get("title") or "").strip()
     product_codes = [str(p.get("productCode")) for p in (j.get("products") or []) if p.get("productCode")]
@@ -60,7 +66,7 @@ def coupon_from_store_json(j: dict, price_map: Dict[str, float]) -> Optional[Cou
 
     def _mk(kind, **kw):
         return Coupon(id=title or str(cid), kind=kind, coupon_code=ccode, coupon_id=cid,
-                      product_codes=product_codes, **kw)
+                      product_codes=product_codes, channel=channel, **kw)
 
     m = _RE_FULL_CUT.search(title)
     if m:
@@ -83,13 +89,16 @@ def coupon_from_store_json(j: dict, price_map: Dict[str, float]) -> Optional[Cou
 
 def best_coupon_saving(
     coupons_json: List[dict], wanted: Dict[str, int], price_map: Dict[str, float],
-    name_map: Optional[Dict[str, str]] = None,
+    name_map: Optional[Dict[str, str]] = None, channel: Optional[str] = None,
 ) -> float:
-    """该店针对给定购物车的最优券节省（每单至多一张券）。"""
+    """该店针对给定购物车的最优券节省（每单至多一张券）。
+
+    channel: 下单渠道；会作为券的渠道标注传给优化器，并按其过滤（见缺口 1）。
+    """
     name_map = name_map or {}
     coupons: List[Coupon] = []
     for j in coupons_json or []:
-        c = coupon_from_store_json(j, price_map)
+        c = coupon_from_store_json(j, price_map, channel=channel)
         if c is not None:
             coupons.append(c)
     if not coupons:
@@ -102,11 +111,14 @@ def best_coupon_saving(
             items.append(Item(name=name_map.get(code, code), price=float(price_map[code]), product_code=code))
     if not items:
         return 0.0
-    return optimize_coupons(items, coupons, max_coupons_per_order=1)["saved"]
+    return optimize_coupons(
+        items, coupons, max_coupons_per_order=1, order_channel=channel
+    )["saved"]
 
 
 def evaluate_quote(
-    quote: StoreQuote, wanted: Dict[str, int], name_map: Optional[Dict[str, str]] = None
+    quote: StoreQuote, wanted: Dict[str, int], name_map: Optional[Dict[str, str]] = None,
+    channel: Optional[str] = None,
 ) -> Dict:
     """计算单店到手价与可行性。缺少任一商品（不可售）则不可行。"""
     missing = [code for code in wanted if code not in quote.prices]
@@ -118,7 +130,7 @@ def evaluate_quote(
             "delivery_fee": quote.delivery_fee, "payable": None,
         }
     items_total = round(sum(float(quote.prices[c]) * q for c, q in wanted.items()), 2)
-    saving = best_coupon_saving(quote.coupons, wanted, quote.prices, name_map)
+    saving = best_coupon_saving(quote.coupons, wanted, quote.prices, name_map, channel=channel)
     payable = round(items_total - saving + quote.delivery_fee, 2)
     return {
         "store_code": quote.store_code, "store_name": quote.store_name,
@@ -134,6 +146,7 @@ def optimize_across_stores(
     *,
     max_distance_m: Optional[float] = None,
     name_map: Optional[Dict[str, str]] = None,
+    channel: Optional[str] = None,
 ) -> Dict:
     """在可接受距离内比较多家门店，求到手价最低的门店并量化距离权衡。
 
@@ -152,7 +165,7 @@ def optimize_across_stores(
     feasible: List[Dict] = []
     too_far: List[Dict] = []
     for q in quotes:
-        ev = evaluate_quote(q, wanted, name_map)
+        ev = evaluate_quote(q, wanted, name_map, channel=channel)
         if not ev["feasible"]:
             notes.append(f"{q.store_name} 缺少商品 {ev['missing']}，不可行")
             continue
