@@ -32,6 +32,9 @@
 | FR-13 | 下单链路 | 到店下单须先由 `calculate-price` 取 `takeWayList[].code` 作为 `takeWayCode`，再调 `create-order`（`mcd_client.create_order` / `pick_take_way`）；须用户显式确认 |
 | FR-14 | 拆分下单 | 真实「每单至多一张券」下，把购物车拆成多单、每单配一张最优券，权衡每单配送费，求全局最低总价（`optimize_split_orders`）；无券/单券或拆分无收益时退化为单订单；`max_orders` 限制拆分规模；券不可跨单复用 |
 | FR-15 | 外送场景 | 外送链路：`delivery-create-address`（建地址）→ `delivery-query-stores`（取门店 `beCode`）→ `query-meals`/`query-store-coupons`/`calculate-price`（**全程必传 `beCode`**）。外送价 = 商品 + 配送费(`deliveryPrice`) + 打包服务费(`packingPrice`)；须校验券渠道（到店专用券外送不可用，`code=600012`）|
+| FR-16 | 套餐纳入优化 | 从 `query-meals`(套餐商品) + `query-meal-detail`(`rounds[].choices[]` 默认项) 解析套餐组件，比较「套餐价 vs 组件单点」，在「套餐/单点」间求全局最低价（`optimize_purchase`）；`plan_order_with_combos` 将套餐与券二选一。**口径**：单点合计仅累计能与菜单对上编码的组件 → 节省为**下界**（`is_lower_bound`）|
+| FR-17 | 多店比价 + 距离权衡 | 在可接受距离（`max_distance_m`）内比较多家门店同品到手价（商品 + 配送 − 最优券），求最低并量化「多走 N 米省 ¥X」（`optimize_across_stores`）；缺货门店跳过并提示 |
+| FR-18 | 一键领券扩池 | `auto-bind-coupons` 领取可领券 → 重查三池 → 再比价（`collect_and_bind_coupons`）；该接口返回**纯文本非 JSON**，须用 `call_tool_text`，异常须容错不中断 |
 
 ## 3. 真实业务规则（来自联调观测，具约束力）
 
@@ -43,6 +46,10 @@
 6. **限流**：每分钟请求上限 600 次（429），禁止在循环中高频刷接口。
 7. **券有渠道限制**：标注「到店专用」的券用于外送核价返回 `code=600012「当前优惠券不可用！」`，到店正常生效；选券须校验 `orderType`。
 8. **外送全程必传 `beCode`**：外送(beType=2/5/6)下 `query-meals` / `query-store-coupons` / `calculate-price` 缺 `beCode` 均报 `code=600048`；`beCode` 来自 `delivery-query-stores`（须先 `delivery-create-address` 建地址）。外送商品 `code` 与到店不通用（到店下单报 `60006 不可售`）。外送价额外含 `deliveryPrice`/`packingPrice`，且折扣可能来自商品自身促销价而非券。
+9. **促销仅企业团餐**：`query-promotions` 返回的促销规则 `beTypes` 全部为 `["6"]`（企业团餐），普通到店/外送不可用 → **不作为省钱候选**（避免虚假承诺）。
+10. **`auto-bind-coupons` 无入参且返回纯文本**：非 JSON，须用 `call_tool_text`；实测领取后门店券 2→3、我的券 2→7。
+11. **同城同品不同价**：中薯条(4810) 在部分门店 ¥13.50、上海食品一店 ¥14.50 → 多店比价有真实收益。
+12. **套餐组件编码与菜单编码可能不一致**：套餐内饮料 `3050` 与菜单独立商品 `9900008751` 编码不同 → 「套餐 vs 单点」只能按能对上编码的组件保守计（节省下界）。
 
 ## 4. 非功能需求（NFR）
 
@@ -70,13 +77,18 @@
 | 真实校准 | `tests/test_live_calibration.py`（`-m live`） | 用真实返回值校准本地价格模型与官方一致 |
 | 真实冒烟 | `tests/test_mcd_client.py::test_live_end_to_end`（`-m live`） | 真实连接完成 `initialize→list_tools→call_tool`，默认跳过 |
 | 真实下单 | `tests/test_mcd_client.py::test_create_order_live_guarded` | 默认跳过，需 `MCD_ALLOW_REAL_ORDER=1` 显式开启（避免误下单）|
+| 领券扩池单测 | `tests/test_auto_bind.py` | `collect_and_bind_coupons`：`call_tool_text` 调用、前后三池对比、净增非负、`beCode` 透传、异常容错 |
+| 套餐优化单测 | `tests/test_combo_optimizer.py` | `parse_meal_detail`/`combo_saving`（真实节省下界）/`optimize_purchase`（与暴力子集基准同解 30 组随机）/`plan_order_with_combos`（套餐 vs 券二选一）|
+| 多店比价单测 | `tests/test_store_optimizer.py` | `optimize_across_stores`（同品不同价、距离过滤、权衡量化、缺货跳过）、门店券标题解析、采集器 |
+| 促销范围合同 | `tests/test_promotions_scope.py` | 真实结论：`query-promotions` 的 `beTypes` 恒为 `["6"]`（企业团餐）；外送缺 `beCode` 报 `600048` |
 
 运行：
 ```bash
-python -m pytest tests/ -q                 # 离线：90 例全过
+python -m pytest tests/ -q                 # 离线：137 例全过
 MCD_MCP_TOKEN=xxx pytest -m live -q        # 真实端到端（可选，4 例 live）
 python examples/demo_smart.py              # B/C/D/E 离线演示
 MCD_MCP_TOKEN=xxx python examples/demo_live.py           # 真实端到端演示（选店→三池→官方核价）
+MCD_MCP_TOKEN=xxx python examples/demo_advanced.py       # 进阶：领券扩池 + 套餐省钱 + 多店比价
 MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 真实官方核价演示
 ```
 
@@ -99,6 +111,10 @@ MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 真实官方核价�
 | **C4** | 真实规则「每单至多一张券」：真机实测传两张券返回 `code=600022「暂不支持多张券使用」`，优化器新增 `max_coupons_per_order`（真实核价路径默认 1），暴力/分支限界/两阶段一致遵守 | `coupon_optimizer.optimize_coupons` / `rank_candidates` / `coupon_smart.two_stage_optimize` | ✅ |
 | **F1** | 拆分下单：真实「每单一张券」下把购物车拆成多单、每单配一张最优券，权衡外送配送费求全局最低价；与暴力划分基准同值 | `coupon_optimizer.optimize_split_orders` / `_assign_best` / `_partitions` | ✅ |
 | **F2** | 外送场景：`price_combo`/`create_order` 支持 `beCode`，新增地址/外送门店封装；外送配送费+打包费建模与券渠道限制契约 | `mcd_client.price_combo` / `query_delivery_stores` / `create_delivery_address` | ✅ |
+| **F3** | 一键领券扩池：`auto-bind-coupons` → 重查三池 → 再比价；修掉 README 早期「声称有、实际无」的能力 | `coupon_pools.collect_and_bind_coupons` | ✅ |
+| **F4** | 套餐纳入优化：套餐 vs 单点求全局最低价，套餐与券二选一（真实最多省 ¥18.00） | `combo_optimizer.optimize_purchase` / `plan_order_with_combos` / `rank_combo_deals` | ✅ |
+| **F5** | 多店比价 + 距离权衡：可接受距离内比较到手价，量化「多走几米省几元」 | `store_optimizer.optimize_across_stores` / `collect_store_quotes` | ✅ |
+| **F6** | 促销范围核实：实测 `query-promotions` 仅企业团餐（`beTypes=["6"]`），诚实排除而非虚假承诺 | `tests/test_promotions_scope.py` | ✅ |
 
 > **关键 Bug 修复（真机联调发现，均补了回归测试）**：
 > 1. `calculate-price` 返回 `{success,code,message,data:{...}}`，需拆到最内层 `data`，否则取到 `price=None` 核价归零；
