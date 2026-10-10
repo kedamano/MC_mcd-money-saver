@@ -9,7 +9,7 @@
   <a href="https://github.com/kedamano/mcd-money-saver/issues"><img src="https://img.shields.io/github/issues/kedamano/mcd-money-saver" alt="GitHub issues"></a>
   <img src="https://img.shields.io/badge/license-参赛声明-brightgreen" alt="License">
   <img src="https://img.shields.io/badge/Python-3.11%2B-blue" alt="Python">
-  <img src="https://img.shields.io/badge/tests-52%20passed-brightgreen" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-58%20passed-brightgreen" alt="Tests">
   <img src="https://img.shields.io/badge/MCP-35%20tools%20live-orange" alt="MCP">
   <img src="https://img.shields.io/badge/Contest-麦当劳MCP大赛-ffc72c" alt="Contest">
 </p>
@@ -52,7 +52,7 @@
 > 美式中杯 ¥19.00 × 0.7 = ¥13.30，与券面"7 折"**完全吻合**，`discount=570` 分，服务端权威价与本地计算一致。
 > 更妙的是：美式中杯是**券锁定商品**——没券时 `calculate-price` 会直接把它踢出订单。这正是本 Skill 用 `product_codes` 做"券↔商品"精确绑定的现实依据。
 
-**自动化验证**：`pytest` 回归 **56 passed（离线 52 + 真实 live 4；另有 1 例真实下单受保护、默认跳过）**。其中 `test_live_end_to_end` 走项目自带 Python 客户端（`mcd_client.py`，纯标准库）真实连通 `initialize → list_tools(35) → now-time-info`；`test_live_calibration` 用真实返回值校准本地价格模型与官方一致。
+**自动化验证**：`pytest` 回归 **62 passed（离线 58 + 真实 live 4；另有 1 例真实下单受保护、默认跳过）**。其中 `test_live_end_to_end` 走项目自带 Python 客户端（`mcd_client.py`，纯标准库）真实连通 `initialize → list_tools(35) → now-time-info`；`test_live_calibration` 用真实返回值校准本地价格模型与官方一致；`test_scale_pruning` 以 40 组随机用例证明**分支限界与暴力枚举同解**。
 
 > 🎬 **想看完整真实链路？** 运行 `MCD_MCP_TOKEN=xxx python examples/demo_live.py`，
 > 一条命令跑通「时间 → 门店 → 菜单 → 优惠券 → 官方核价」，样例输出见 [`DEMO.md`](DEMO.md)。
@@ -66,7 +66,7 @@ flowchart LR
     U["💬 用户一句话<br/>『帮我点麦当劳怎么最省』"] --> S["🤖 WorkBuddy<br/>麦麦省钱助手 Skill"]
     S --> C["🎫 收券·三池并集<br/>门店券 + 我的券 + 麦麦省券"]
     S --> M["🏪 选门店 / 拉菜单<br/>query-nearby-stores · query-meals"]
-    C --> O["🧮 本地优化器<br/>暴力枚举所有可叠加组合 → Top-K 候选"]
+    C --> O["🧮 本地优化器<br/>暴力枚举 / 分支限界 → Top-K 候选"]
     O --> V["✅ 官方核价<br/>calculate-price 取权威价"]
     V --> R["📋 最低到手价 + 用券明细"]
     R --> D["🛒 确认 → create-order 下单"]
@@ -83,7 +83,7 @@ flowchart LR
 
 | 阶段 | 做什么 | 特点 |
 |---|---|---|
-| **① 本地枚举（毫秒级）** | 暴力枚举所有券的叠加组合，在「门槛校验 + 订单级券至多一张 + 免配送费券互斥」约束下求 Top-K 最低价候选 | 0 网络开销，瞬间出候选 |
+| **① 本地求解（毫秒级）** | 小券池（≤16 张）暴力枚举所有叠加组合；大券池自动切**分支限界**（先剔 0 优惠券，再按乐观上界剪枝），在「门槛校验 + 订单级券至多一张 + 免配送费券至多一张」约束下求 Top-K 最低价候选 | 0 网络开销；券数大也可扩展 |
 | **② 官方核价（权威）** | 仅对 Top-K 候选调用麦当劳 `calculate-price`，取官方返回的真实价 | 以官方为准，杜绝"算得美、下单贵" |
 
 > 实测：阶段①本地最优与阶段②官方核价**完全一致**（美式 7 折 19×0.7=13.30），模型与服务端真实行为对齐。
@@ -95,7 +95,7 @@ flowchart LR
 | 能力 | 说明 |
 |---|---|
 | 多池并集比券 | 门店券、我的券、麦麦省券三池聚合；**真机实测三池返回结构不同**（门店券为结构化 JSON 可核价，我的券/麦麦省券为 Markdown 需解析），按券名去重、标注可领取扩池 |
-| 最优叠加组合 | 满减 / 折扣 / 立减 / 免配送费 自动求最低价 |
+| 最优叠加组合 | 满减 / 折扣 / 立减 / 免配送费 自动求最低价；**大券池走分支限界**（n=20 时较暴力枚举快 ~260×，与暴力枚举**同解**）|
 | 类目 & 互斥约束 | 支持类目限定券；订单级券至多一张，贴合真实规则 |
 | 🅱️ **产品级绑定** | 券按 `product_codes` 精确匹配，错配自动失效（券锁定商品也能正确处理）|
 | 🅲️ **凑单建议** | 距满减门槛差 X 元时，反推最小代价加购组合，净亏不推 |
@@ -152,7 +152,7 @@ flowchart LR
 核心算法与真实接口解析均可离线测试，不依赖麦当劳 MCP：
 
 ```bash
-python -m pytest tests/ -q                 # 离线：52 例全过（含真实合同测试）
+python -m pytest tests/ -q                 # 离线：58 例全过（含真实合同测试）
 python scripts/doctor.py                   # 环境自检：查 mcp.json 的 type / Token 前缀
 python src/coupon_optimizer.py             # 内置演示（基础优化器）
 python examples/demo_smart.py              # B/C/D/E 离线演示
@@ -177,7 +177,7 @@ mcd-money-saver/
 ├── DEMO.md                     # 真实端到端演示样例输出（可截图）
 ├── workbuddy.md                # WorkBuddy 联动开发上下文（专项奖励核验）
 ├── src/
-│   ├── coupon_optimizer.py     # 优惠券最优组合优化器（核心 + B/E + rank_candidates）
+│   ├── coupon_optimizer.py     # 最优组合优化器（暴力枚举 / 分支限界双策略 + B/E + rank_candidates）
 │   ├── coupon_adapter.py       # 真实券 JSON -> 领域 Coupon（含 product_codes/expires_at）
 │   ├── coupon_pools.py         # 三池聚合：门店券(JSON) / 我的券 / 麦麦省券(Markdown) 解析
 │   ├── coupon_smart.py         # C 凑单建议 + D 两阶段校验（智能决策增强）
@@ -188,6 +188,7 @@ mcd-money-saver/
 │   ├── test_real_contract.py   # 真实合同测试（基于 fixtures 黄金基准）
 │   ├── test_coupon_pools.py    # 三池 Markdown 解析 + 聚合测试
 │   ├── test_time_window.py     # 生效时间 / 每日时段窗过滤测试
+│   ├── test_scale_pruning.py   # 大规模券剪枝 + 分支限界（与暴力枚举同解 + 性能）
 │   ├── test_live_calibration.py# 本地价格模型 vs 官方核价（live 校准）
 │   ├── test_mcd_client.py      # 客户端解析单测 + 可选真实冒烟(-m live)
 │   └── fixtures/               # 真实 calculate-price 返回 + 真实菜单目录（脱敏）
