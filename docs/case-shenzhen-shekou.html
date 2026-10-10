@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今天在深圳蛇口网谷，怎么点最省 · 真实核价案例</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --line:#2b3240;
+    --ink:#e6edf3; --sub:#9aa7b8; --muted:#6b7688;
+    --red:#e8474a; --red2:#ff6b6e; --gold:#ffc72c; --gold2:#ffd95e;
+    --green:#3fb950; --blue:#58a6ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:radial-gradient(1200px 600px at 50% -100px,#1b2130 0%,var(--bg) 60%);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    line-height:1.65; padding:40px 18px 60px;
+  }
+  .wrap{max-width:900px;margin:0 auto}
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;font-size:12.5px;letter-spacing:.3px;
+    background:rgba(232,71,74,.14);color:var(--red2);border:1px solid rgba(232,71,74,.35);
+    padding:5px 12px;border-radius:999px;font-weight:600;
+  }
+  h1{font-size:31px;line-height:1.3;margin:16px 0 8px;font-weight:800;letter-spacing:-.4px}
+  h1 .hl{color:var(--gold)}
+  .lead{color:var(--sub);font-size:15px;margin-bottom:26px}
+  .lead b{color:var(--ink)}
+
+  .store{
+    display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;
+    background:linear-gradient(135deg,#1a2030,#151a24);
+    border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:12px;
+  }
+  .store .name{font-size:18px;font-weight:700}
+  .store .addr{color:var(--sub);font-size:13px;margin-top:3px}
+  .store .meta{display:flex;gap:20px;text-align:right}
+  .store .meta div{font-size:12px;color:var(--muted)}
+  .store .meta b{display:block;font-size:17px;color:var(--gold);font-weight:800}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 34px}
+  .chip{font-size:12.5px;color:var(--sub);background:var(--panel);border:1px solid var(--line);
+    padding:5px 11px;border-radius:8px}
+  .chip.on{color:var(--green);border-color:rgba(63,185,80,.4);background:rgba(63,185,80,.08)}
+  .chip.off{color:var(--muted);text-decoration:line-through;opacity:.7}
+
+  h2{font-size:19px;margin:34px 0 14px;display:flex;align-items:center;gap:9px;font-weight:700}
+  h2::before{content:"";width:4px;height:19px;background:var(--red);border-radius:2px}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}.store .meta{text-align:left}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 17px;position:relative;overflow:hidden}
+  .card .tag{font-size:11.5px;font-weight:700;letter-spacing:.4px;padding:3px 9px;border-radius:6px;display:inline-block;margin-bottom:10px}
+  .card.best{border-color:rgba(255,199,44,.5);box-shadow:0 0 0 1px rgba(255,199,44,.12), 0 10px 30px -18px rgba(255,199,44,.5)}
+  .card.best::after{content:"最省";position:absolute;top:12px;right:12px;font-size:11px;font-weight:800;
+    color:#241a00;background:var(--gold);padding:3px 9px;border-radius:6px}
+  .t-red{background:rgba(232,71,74,.16);color:var(--red2)}
+  .t-gold{background:rgba(255,199,44,.16);color:var(--gold2)}
+  .t-blue{background:rgba(88,166,255,.15);color:var(--blue)}
+  .t-green{background:rgba(63,185,80,.15);color:var(--green)}
+  .card h3{font-size:15.5px;font-weight:700;margin-bottom:8px}
+  .card .price{font-size:27px;font-weight:800;color:var(--gold);letter-spacing:-.5px}
+  .card .price small{font-size:13px;color:var(--muted);font-weight:500;margin-left:6px;text-decoration:line-through}
+  .card p{font-size:12.5px;color:var(--sub);margin-top:8px}
+  .card p b{color:var(--green)}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  th,td{padding:11px 13px;text-align:left;border-bottom:1px solid var(--line)}
+  th{font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.3px;background:var(--panel2)}
+  tr:last-child td{border-bottom:none}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .cut{color:var(--green);font-weight:700}
+  .dim{color:var(--muted)}
+  .row-best{background:rgba(255,199,44,.05)}
+
+  .rules{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:6px 4px;margin-top:14px}
+  .rule{display:flex;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .rule:last-child{border-bottom:none}
+  .rule .ico{flex:0 0 30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .rule h4{font-size:14px;font-weight:700;margin-bottom:2px}
+  .rule p{font-size:12.5px;color:var(--sub)}
+  .rule code{background:#0b0f16;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12px;color:var(--gold2)}
+
+  .plan{background:linear-gradient(135deg,rgba(232,71,74,.13),rgba(255,199,44,.1));
+    border:1px solid rgba(255,199,44,.3);border-radius:16px;padding:20px 22px;margin-top:14px}
+  .plan h3{font-size:16px;margin-bottom:12px;color:var(--gold)}
+  .plan ol{margin-left:18px;font-size:14px}
+  .plan li{margin-bottom:7px}
+  .plan li b{color:var(--ink)}
+  .plan .total{font-size:14px;color:var(--sub);margin-top:12px;padding-top:12px;border-top:1px dashed rgba(255,199,44,.3)}
+  .plan .total b{font-size:22px;color:var(--gold);font-weight:800}
+
+  footer{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--muted);line-height:1.9}
+  footer code{color:var(--sub)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <span class="badge">● 真实核价 · 麦当劳中国 MCP</span>
+  <h1>今天在深圳蛇口网谷，<br>怎样点<span class="hl">最省钱</span></h1>
+  <p class="lead">全部金额来自 <b>官方 <code style="color:var(--gold2)">calculate-price</code> 实时返回</b>，非估算。采集时间：<b>2026-10-10（周六）15:44</b>，北京时间。</p>
+
+  <div class="store">
+    <div>
+      <div class="name">🍟 麦当劳深圳蛇口网谷餐厅</div>
+      <div class="addr">南山区南海大道 1031 号 蛇口网谷万海大厦 A 座 106 房</div>
+    </div>
+    <div class="meta">
+      <div>距离<b>383 m</b></div>
+      <div>营业<b>07:00–21:00</b></div>
+      <div>店铺码<b>1420621</b></div>
+    </div>
+  </div>
+  <div class="chips">
+    <span class="chip on">✓ 9.9 元中杯冰美式（今日可用）</span>
+    <span class="chip on">✓ 中杯美式 7 折（05:00–23:59）</span>
+    <span class="chip on">✓ 中杯奶铁 7 折（05:00–23:59）</span>
+    <span class="chip on">✓ 麦旋风买一送一（今天最后一天）</span>
+    <span class="chip off">✗ 松饼猪柳蛋套餐（仅早餐时段 05:00–10:29）</span>
+  </div>
+
+  <h2>三条最省点法（真实核价）</h2>
+  <div class="grid">
+    <div class="card best">
+      <span class="tag t-gold">正餐 · 最省</span>
+      <h3>龙焰鸡腿堡三件套</h3>
+      <div class="price">¥26.90 <small>¥47.00</small></div>
+      <p>含龙焰鸡腿堡 + 中薯条 + 中可乐。单点同款要 ¥47，<b>省 ¥20.10（-42.8%）</b>。套餐是这家店最大的省钱杠杆。</p>
+    </div>
+    <div class="card">
+      <span class="tag t-red">咖啡 · 券最猛</span>
+      <h3>麦咖啡美式 + 9.9 元券</h3>
+      <div class="price">¥9.90 <small>¥19.00</small></div>
+      <p>券比自带促销更狠：无券 ¥11.90，用 9.9 券再砍到 ¥9.90，<b>省 ¥9.10</b>。本店单张券里最值。</p>
+    </div>
+    <div class="card">
+      <span class="tag t-blue">加餐 · 限今天</span>
+      <h3>麦旋风买一送一</h3>
+      <div class="price">2 个 <small>¥31.00</small></div>
+      <p>麦旋风单点 ¥15.5/个。<b>仅限 10-11 前，每日 10:00–22:00</b>——今天不来就浪费了。</p>
+    </div>
+  </div>
+
+  <h2>单点 vs 套餐 vs 用券 · 对照账</h2>
+  <table>
+    <thead>
+      <tr><th>点法</th><th>怎么点</th><th class="num">原来</th><th class="num">到手</th><th class="num">省</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="dim">❌ 最贵</td><td>汉堡+薯条+可乐 逐样单点</td><td class="num dim">¥47.00</td><td class="num">¥47.00</td><td class="num dim">—</td></tr>
+      <tr class="row-best"><td class="cut">✅ 最省</td><td>同款改点「龙焰鸡腿堡三件套」</td><td class="num dim">¥47.00</td><td class="num"><b>¥26.90</b></td><td class="num cut">−¥20.10</td></tr>
+      <tr><td class="dim">❌ 常见</td><td>麦咖啡美式（不用券）</td><td class="num dim">¥19.00</td><td class="num">¥11.90</td><td class="num cut">−¥7.10</td></tr>
+      <tr class="row-best"><td class="cut">✅ 最省</td><td>麦咖啡美式 + 9.9 元券</td><td class="num dim">¥19.00</td><td class="num"><b>¥9.90</b></td><td class="num cut">−¥9.10</td></tr>
+      <tr><td>对照</td><td>麦咖啡奶铁 + 7 折券</td><td class="num dim">¥21.00</td><td class="num">¥14.70</td><td class="num cut">−¥6.30</td></tr>
+      <tr><td class="dim">❌ 别这样</td><td>套餐 + 咖啡 放同一单</td><td class="num dim">¥45.90</td><td class="num">¥38.80</td><td class="num cut">−¥7.10</td></tr>
+      <tr class="row-best"><td class="cut">✅ 拆两单</td><td>单1 套餐 ¥26.90 + 单2 咖啡券 ¥9.90</td><td class="num dim">¥45.90</td><td class="num"><b>¥36.80</b></td><td class="num cut">−¥9.10</td></tr>
+    </tbody>
+  </table>
+
+  <h2>为什么不能"又想套餐又用券"？两条真实规则</h2>
+  <div class="rules">
+    <div class="rule">
+      <div class="ico" style="background:rgba(232,71,74,.16);color:var(--red2)">1</div>
+      <div>
+        <h4>每单只能用一张券</h4>
+        <p>传两张券，官方直接拒绝：<code>code 600022 暂不支持多张券使用</code>。</p>
+      </div>
+    </div>
+    <div class="rule">
+      <div class="ico" style="background:rgba(232,71,74,.16);color:var(--red2)">2</div>
+      <div>
+        <h4>套餐本身是促销价，不能再叠券</h4>
+        <p>「套餐 + 咖啡券」同单实测被拒：<code>code 600012 促销规则不支持该商品</code>。所以要两份优惠，就得<b style="color:var(--ink)">拆成两单</b>下。</p>
+      </div>
+    </div>
+    <div class="rule">
+      <div class="ico" style="background:rgba(63,185,80,.15);color:var(--green)">✓</div>
+      <div>
+        <h4>券有时段限制，过点作废</h4>
+        <p>松饼猪柳蛋套餐券只在 <b style="color:var(--ink)">早餐 05:00–10:29</b> 可用；麦旋风买一送一只在 <b style="color:var(--ink)">10:00–22:00</b>，且今天（10-11）是最后一天。</p>
+      </div>
+    </div>
+  </div>
+
+  <h2>给你的最优点单方案</h2>
+  <div class="plan">
+    <h3>🛒 假设你「一个人、想吃饱又想喝咖啡」</h3>
+    <ol>
+      <li><b>第 1 单</b>：点「龙焰鸡腿堡三件套」→ <b>¥26.90</b>（比单点省 ¥20.10）</li>
+      <li><b>第 2 单</b>：点「麦咖啡美式」并用 9.9 元券 → <b>¥9.90</b>（比不用券省 ¥9.10）</li>
+      <li>（可选）<b>第 3 单</b>：麦旋风买一送一，两个 ¥15.50 档的只花约一个的钱</li>
+    </ol>
+    <div class="total">拆单合计：<b>¥36.80</b>　·　若全部按原价单点要 ¥66.00＋，<span class="cut">共省约 ¥29</span></div>
+  </div>
+
+  <footer>
+    数据来源：麦当劳中国 MCP（<code>mcp.mcd.cn</code>，35 个工具）真实调用 ——
+    <code>query-nearby-stores</code> / <code>query-store-coupons</code> / <code>query-my-coupons</code> /
+    <code>query-meals</code> / <code>query-meal-detail</code> / <code>calculate-price</code>，
+    金额均为服务端返回的「分」换算，非本地估算。<br>
+    由「麦麦省钱助手」Skill 自动生成 · 2026-10-10 15:44（北京时间）实测 ·
+    价格与券以你下单当时官方返回为准。
+  </footer>
+
+</div>
+</body>
+</html>
