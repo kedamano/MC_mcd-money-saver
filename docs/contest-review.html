@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>参赛体检报告 · 麦麦省钱助手 | 麦当劳 MCP 创意开发大赛</title>
+<style>
+  :root{
+    --bg:#0d0f14; --panel:#151922; --panel2:#1b2130; --line:#26304a;
+    --txt:#e8edf7; --dim:#95a1bb; --yellow:#ffc72c; --mcd:#da291c;
+    --ok:#3ddc97; --warn:#ffb020; --bad:#ff5d5d; --info:#5aa9ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 620px at 18% -12%,#20293f 0%,var(--bg) 58%);
+    color:var(--txt);font:15px/1.72 "Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;padding:40px 20px 80px}
+  .wrap{max-width:1020px;margin:0 auto}
+  .kicker{color:var(--yellow);letter-spacing:.22em;font-size:12px;font-weight:700}
+  h1{font-size:30px;margin:8px 0 6px;letter-spacing:-.4px}
+  .sub{color:var(--dim);font-size:13.5px;margin-bottom:26px}
+  .verdict{background:linear-gradient(135deg,#2b1a12,#151922);border:1px solid #7a3a22;
+    border-left:4px solid var(--mcd);border-radius:14px;padding:18px 22px;margin-bottom:28px}
+  .verdict b{color:var(--yellow)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px;margin-bottom:30px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 17px}
+  .card .n{font-size:27px;font-weight:800;letter-spacing:-1px;line-height:1.15}
+  .card .l{color:var(--dim);font-size:12.5px;margin-top:3px}
+  .n.r{color:var(--bad)} .n.g{color:var(--ok)} .n.y{color:var(--yellow)} .n.b{color:var(--info)} .n.w{color:var(--warn)}
+  h2{font-size:19px;margin:34px 0 14px;padding-left:12px;border-left:4px solid var(--mcd)}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border-radius:12px;overflow:hidden;font-size:13.5px}
+  th{background:var(--panel2);color:var(--dim);text-align:left;padding:11px 13px;font-weight:600;font-size:12.5px}
+  td{padding:10px 13px;border-top:1px solid #1f2739;vertical-align:top}
+  tr:hover td{background:#171d29}
+  .bar{height:9px;border-radius:6px;background:#222b3d;overflow:hidden;min-width:60px}
+  .bar>i{display:block;height:100%;border-radius:6px}
+  .me{color:var(--yellow);font-weight:700}
+  .pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .p-ok{background:rgba(61,220,151,.14);color:var(--ok);border:1px solid rgba(61,220,151,.3)}
+  .p-warn{background:rgba(255,176,32,.13);color:var(--warn);border:1px solid rgba(255,176,32,.3)}
+  .p-bad{background:rgba(255,93,93,.13);color:var(--bad);border:1px solid rgba(255,93,93,.3)}
+  .p-info{background:rgba(90,169,255,.13);color:var(--info);border:1px solid rgba(90,169,255,.3)}
+  ul{padding-left:20px;margin:8px 0}
+  li{margin:5px 0}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 20px}
+  .box h3{font-size:15px;margin:2px 0 8px}
+  .box.good h3{color:var(--ok)} .box.bad h3{color:var(--bad)}
+  code{background:#0a0d13;border:1px solid #222b3d;border-radius:6px;padding:1.5px 6px;font-size:12.5px;color:#ffd98a}
+  .todo{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .todo .row{display:flex;gap:14px;padding:14px 18px;border-top:1px solid #1f2739;align-items:flex-start}
+  .todo .row:first-child{border-top:0}
+  .todo .rank{flex:0 0 46px;font-weight:800;font-size:13px;color:var(--dim);padding-top:2px}
+  .todo .rank.hi{color:var(--bad)} .todo .rank.mid{color:var(--warn)} .todo .rank.lo{color:var(--info)}
+  .todo h4{margin:0 0 4px;font-size:14.5px}
+  .todo p{margin:0;color:var(--dim);font-size:13px}
+  .risk{background:linear-gradient(135deg,#2b1414,#151922);border:1px solid #7a2b2b;border-left:4px solid var(--bad);
+    border-radius:14px;padding:16px 20px;margin-top:28px}
+  .risk b{color:var(--bad)}
+  footer{margin-top:38px;color:#6c7793;font-size:12.5px;border-top:1px solid var(--line);padding-top:16px}
+  @media(max-width:680px){.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">参赛体检报告 · 2026-10-10 16:00 榜单快照</div>
+  <h1>工程分 A，传播分 D —— 这是当前最大的问题</h1>
+  <div class="sub">麦当劳程序员创意开发大赛 · 157 个参赛项目在榜 · 排名口径：GitHub 公开 Star 数</div>
+
+  <div class="verdict">
+    <b>一句话评价：</b>这是一份<b>技术上能进前十、分数上排在后 40%</b>的作品。
+    代码质量与工程完备度远超同场大多数项目，但本赛事<b>100% 按 Star 排名</b>，
+    而作品在"被人看见"这件事上几乎是空的——目前 <b>1 Star / 排名并列 91</b>。
+    剩余 <b>15 天</b>，该做的不是继续写代码，而是把作品推到人面前。
+  </div>
+
+  <div class="grid">
+    <div class="card"><div class="n r">91</div><div class="l">当前排名（并列）</div></div>
+    <div class="card"><div class="n r">1</div><div class="l">Star 数</div></div>
+    <div class="card"><div class="n w">2</div><div class="l">全场星数中位数</div></div>
+    <div class="card"><div class="n b">67</div><div class="l">第 1 名 Star 数</div></div>
+    <div class="card"><div class="n y">15</div><div class="l">剩余天数（至 10-25）</div></div>
+    <div class="card"><div class="n g">170</div><div class="l">离线测试全绿</div></div>
+  </div>
+
+  <h2>你在星数分布里的位置</h2>
+  <table>
+    <thead><tr><th>项目</th><th style="width:46%">Star 分布</th><th>星数</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>mcd-event-radar（第 1 名）</td><td><div class="bar"><i style="width:100%;background:linear-gradient(90deg,#ffc72c,#da291c)"></i></div></td><td>67</td><td><span class="pill p-ok">头部</span></td></tr>
+      <tr><td>mcd-party-officer（第 2 名）</td><td><div class="bar"><i style="width:57%;background:#8aa6d8"></i></div></td><td>38</td><td><span class="pill p-info">前 3</span></td></tr>
+      <tr><td>mcd-saver-strategist（同赛道最强）</td><td><div class="bar"><i style="width:42%;background:#8aa6d8"></i></div></td><td>28</td><td><span class="pill p-info">前 5</span></td></tr>
+      <tr><td>全场中位数项目</td><td><div class="bar"><i style="width:6%;background:#5f6b85"></i></div></td><td>2</td><td><span class="pill p-warn">中位</span></td></tr>
+      <tr><td class="me">mcd-money-saver（本作品）</td><td><div class="bar"><i style="width:3%;background:#ff5d5d"></i></div></td><td class="me">1</td><td><span class="pill p-bad">后 40%</span></td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--dim);font-size:13px;margin-top:10px">
+    全场 157 个项目：<b>90 个已有 ≥2 Star</b>，<b>67 个项目并列在 1 Star</b>（排名 91）。本作品落在 1 Star 组里，尚未拿到任何一个"陌生人的认可"。
+  </p>
+
+  <div class="two" style="margin-top:30px">
+    <div class="box good">
+      <h3>✅ 真正的强项（评审看得见）</h3>
+      <ul>
+        <li><b>工程完备度罕见</b>：175 项测试（离线 170 全绿）+ GitHub Actions CI，同场多数项目只有个 README。</li>
+        <li><b>真机联调，不是 Demo</b>：真实打通 <code>mcp.mcd.cn</code> 35 个工具，含到店 / 外送双链路与真实核价。</li>
+        <li><b>关键正确性防守</b>：区分「券被官方拒绝」与「网络异常」，杜绝"算得省、下单废"的假方案——<b>这一点同赛道几乎没人做</b>。</li>
+        <li><b>诚实</b>：实测发现促销仅对企业团餐可用，就明确不把它当卖点，而不是编一个好看的功能。</li>
+        <li><b>文档密度高</b>：README / SPEC / SKILL / MCP_INTEGRATION / DEMO + 真实案例报告，可读性远超平均。</li>
+      </ul>
+    </div>
+    <div class="box bad">
+      <h3>❌ 致命短板</h3>
+      <ul>
+        <li><b>没有"让人点进来就有感觉"的入口</b>：无在线体验页、无演示链接。第 1 名 <code>mcd-event-radar</code> 首页直接挂了一个可玩的在线 Demo。</li>
+        <li><b>同赛道极度拥挤</b>：省钱 / 比价 / 优惠券 / 积分 主题在榜上至少 <b>34 个</b>，光叫 <code>mcd-saver</code> 的就有 4 个。差异化没被讲出来。</li>
+        <li><b>产出形态偏"工具"而非"话题"</b>：输出是终端表格；头部作品是活动地图 / 派对黄历 / 卡路里，天然更容易被转发。</li>
+        <li><b>陌生触点为零</b>：0 fork、0 外部 Star，说明作品还没有走出自己的账号。</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>15 天冲榜清单（按 ROI 排序）</h2>
+  <div class="todo">
+    <div class="row">
+      <div class="rank hi">P0</div>
+      <div>
+        <h4>补齐 WorkBuddy 专项材料 — 直接关系到积分奖励</h4>
+        <p>报名 Issue #223 正文只有 4 行，<b>没有附上 <code>workbuddy.md</code> 与 WorkBuddy 对话上下文</b>。
+        规则明确：进榜项目中"真实使用 WorkBuddy 且提交了 workbuddy.md"的才拿专项积分（前 100 名各 3000 分）。
+        仓库里文件是有的，编辑 Issue 补上即可。<b>成本极低，别漏。</b></p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="rank hi">P0</div>
+      <div>
+        <h4>做一张在线体验页（可分享链接）</h4>
+        <p>把深圳蛇口真实案例做成单文件网页：一句话输入 → 输出"今日最省点法 + 省了多少钱"。
+        这是所有推广文案的<b>落地页</b>。没有它，小红书/群里的流量来了也留不住。</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="rank mid">P1</div>
+      <div>
+        <h4>写"冲榜内容包"并投放</h4>
+        <p>小红书图文（真实账单截图：龙焰鸡腿堡三件套 ¥26.90 vs 单点 ¥47.00、省 ¥20.10）、公众号短文、微信群/同事话术。
+        <b>每个真实用户只值 1 Star，量才是关键。</b></p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="rank mid">P1</div>
+      <div>
+        <h4>把差异化写进首屏</h4>
+        <p>同赛道 34 个项目，标题里都能看到"省钱"。要抢的是这个点：
+        <b>只有我们做到"本地算完还送官方核价复核"</b>，别人算的省钱是估算，我们是官方价。</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="rank lo">P2</div>
+      <div>
+        <h4>补齐开源观感</h4>
+        <p>当前仓库<b>无 LICENSE</b>。加一个 MIT / Apache-2.0，再补一句贡献指引，能让"正经开源项目"的印象分上来。</p>
+      </div>
+    </div>
+    <div class="row">
+      <div class="rank lo">P2</div>
+      <div>
+        <h4>元数据一致性</h4>
+        <p>仓库描述曾写"95 项测试全绿"、README 徽章写 168，与实际 175 不符。<b>已修正</b>（描述 + 徽章已同步为 175）。评审会看这种细节。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="risk">
+    <b>⚠️ 一个容易被忽略的风险：现在的位置是"刚好在奖励线内，且随时会掉出去"。</b><br>
+    <span style="color:var(--dim)">规则是"按 Star 排序后的前 100 个项目进入排行榜"，进入榜单即有实物周边 + 积分奖励。
+    当前有 <b>90 个项目达到 ≥2 Star</b>、67 个项目挤在 1 Star（本作品在其中，并列第 91）。
+    也就是说<b>再有大约 10 个项目涨到 2 Star，1 Star 组就会整体跌出前 100</b>。
+    距离 10-25 截止还有 15 天，只守不攻＝大概率出榜。</span>
+  </div>
+
+  <footer>
+    数据来源：官方仓库 <code>RANKING.md</code>（更新时间 2026-10-10 16:00:19）、<code>activityGuidelines.md</code> 活动规则、报名 Issue #223 · 均为 GitHub 公开接口实时读取<br>
+    麦麦省钱助手 · 麦当劳程序员创意开发大赛参赛作品 · 本页数据未做美化性修改
+  </footer>
+</div>
+</body>
+</html>
