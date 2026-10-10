@@ -19,9 +19,7 @@
 </p>
 
 <p align="center">  
-  <b>⭐ 如果这个项目帮到了你，点个 Star 支持一下，也帮它冲一波大赛排名！</b>  
-  
-  <a href="https://github.com/kedamano/mcd-money-saver">github.com/kedamano/mcd-money-saver</a>  
+  <a href="https://github.com/kedamano/mcd-money-saver"><b>⭐ 如果这个项目帮到了你，点个 Star 支持一下，也帮它冲一波大赛排名！</b></a>  
 </p>
 
 <p align="center">  
