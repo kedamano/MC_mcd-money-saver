@@ -42,7 +42,17 @@ agent_created: true
 - `available-coupons` —— 可领取的麦麦省券
 - （可选）`auto-bind-coupons` —— 一键领取麦麦省券，扩充券池后再查一次 `query-my-coupons`
 
-将每张券建模为 `Coupon(id, kind, ...)`：
+> ⚠️ **真实结构差异（真机实测）**：三池**返回格式不同**，不能一视同仁——
+> - `query-store-coupons` 返回**结构化 JSON**（含 `couponCode`/`couponId`/`products`）
+>   → 这是**唯一能直接送 `calculate-price` 核价**的池，作为最优化的**主集**；
+> - `query-my-coupons` 返回 **Markdown 文本**（券名 / 用券价格 / 有效期 / 标签，无 couponCode）
+>   → 按**券名**与门店券交叉核对、去重，用于确认"用户是否真的拥有"；
+> - `available-coupons` 返回 **Markdown 文本**（券名 / 状态：可领取）
+>   → 需先 `auto-bind-coupons` 领取才可能进入可用池，列为**扩池建议**。
+>
+> 上述解析与聚合已实现在 `src/coupon_pools.py`（`collect_coupon_pools`），可直接调用。
+
+将门店券建模为 `Coupon(id, kind, ...)`：
 - 满减 → `kind="threshold", discount=Y, threshold=X`
 - 折扣 → `kind="percent", discount=0.85`（85 折），可设 `max_discount` 封顶
 - 立减 → `kind="fixed", discount=Y`，类目券设 `applies_to`
