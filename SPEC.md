@@ -63,7 +63,7 @@
 
 运行：
 ```bash
-python -m pytest tests/ -q                 # 离线：48 例全过
+python -m pytest tests/ -q                 # 离线：52 例全过
 MCD_MCP_TOKEN=xxx pytest -m live -q        # 真实端到端（可选，4 例 live）
 python examples/demo_smart.py              # B/C/D/E 离线演示
 MCD_MCP_TOKEN=xxx python examples/demo_live.py           # 真实端到端演示（选店→三池→官方核价）
@@ -83,6 +83,7 @@ MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 真实官方核价�
 | **B1** | 生效时间/时段窗：`valid_from` + 每日 `time_windows`（支持跨零点）+ `expires_at` 三重过滤 | `coupon_optimizer.filter_active_coupons` / `Coupon.valid_from` / `time_windows` | ✅ |
 | **D1** | CI 绿徽章：每次 push 自动跑离线测试 | `.github/workflows/ci.yml` | ⏳（需仓库 `workflow` 权限推送）|
 | **D2** | 真实核价 demo + 文档 | `examples/demo_live.py` / `DEMO.md` | ✅ |
+| **C1** | 健壮性：瞬时错误(404/5xx/429)指数退避重试 + 熔断（副作用调用禁用重试）；读接口 TTL 缓存；环境自检脚本 | `mcd_client._post`/`call_tool_cached` / `scripts/doctor.py` | ✅ |
 
 > **关键 Bug 修复（真机联调发现，均补了回归测试）**：
 > 1. `calculate-price` 返回 `{success,code,message,data:{...}}`，需拆到最内层 `data`，否则取到 `price=None` 核价归零；
