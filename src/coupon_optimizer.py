@@ -8,7 +8,9 @@
 设计目标：
 - 支持麦当劳常见券类型：满减(threshold)、折扣(percent)、立减(fixed)、免配送费(free_delivery)
 - 支持类目限制(applies_to)与互斥组(stack_group)
-- 通过暴力枚举所有子集 + 约束剪枝保证结果最优（候选券数量通常为个位数，性能充足）
+- 小券池：暴力枚举所有子集 + 约束校验，保证全局最优
+- 大券池：先剔 0 优惠券，再用**分支限界**（乐观上界剪枝）求得与暴力枚举同解的结果，
+  避免 2^n 组合爆炸（见 `optimize_coupons(strategy=...)` 与 `_optimal_subset_bnb`）
 
 Author: 麦麦省钱助手参赛项目
 """
@@ -155,12 +157,140 @@ def _is_valid_subset(subset: List[Coupon], items: List[Item], delivery_fee: floa
     return True
 
 
+def _coupon_ideal_discount(coupon: Coupon, items: List[Item], delivery_fee: float) -> float:
+    """单张券的「乐观优惠上界」（分支限界剪枝用）。
+
+    刻意放宽门槛/前置条件，取该券可能达到的最大优惠，构成合法**上界**。
+    上界只可高估、不可低估，否则会误剪最优解（剪枝的正确性前提）。
+    """
+    if coupon.kind == "free_delivery":
+        return delivery_fee
+    if coupon.kind in ("threshold", "fixed"):
+        return coupon.discount
+    if coupon.kind == "percent":
+        return _coupon_discount(coupon, items)
+    return 0.0
+
+
+def _take_discount(coupon: Coupon, items: List[Item], delivery_fee: float) -> float:
+    """券被选中后计入的实际优惠（免配送费按配送费计）。"""
+    if coupon.kind == "free_delivery":
+        return delivery_fee
+    return _coupon_discount(coupon, items)
+
+
+def _can_take(
+    coupon: Coupon, items: List[Item], used_groups: frozenset, order_level_count: int
+) -> bool:
+    """在已选状态 (used_groups, order_level_count) 上，判断能否再选该券。
+
+    与 `_is_valid_subset` 的约束一一对应且**与选择顺序无关**：
+    同组互斥 / 订单级券至多一张 / 满减门槛 / 立减需有适用商品。
+    """
+    grp = _effective_group(coupon)
+    if grp is not None and grp in used_groups:
+        return False
+    if _is_order_level(coupon) and order_level_count >= 1:
+        return False
+    if coupon.kind == "threshold":
+        eligible = _eligible_items(coupon, items)
+        if sum(e.price for e in eligible) < coupon.threshold:
+            return False
+    if coupon.kind == "fixed":
+        if not _eligible_items(coupon, items):
+            return False
+    return True
+
+
+def _prune_zero_value(
+    coupons: List[Coupon], items: List[Item], delivery_fee: float
+) -> List[Coupon]:
+    """剔除单券实际优惠为 0 的券（安全剪枝）。
+
+    各券优惠相互独立且可加：0 优惠券无论是否入选都不改变总价，却会参与
+    互斥/门槛判定，因此求解前剔除不损失最优解（也不会误剪）。
+    """
+    return [c for c in coupons if _take_discount(c, items, delivery_fee) > 0]
+
+
+def _optimal_subset_bnb(
+    items: List[Item], coupons: List[Coupon], delivery_fee: float
+) -> "tuple[float, List[Coupon], dict]":
+    """分支限界求「优惠总额最大（即应付最低）」的券子集。
+
+    返回 (best_total, best_subset, stats)。保证与暴力枚举**同解**，但在券数
+    较大时通过「乐观上界剪枝 + 按上界降序分支」大幅压缩搜索节点。
+
+    剪枝条件：当前优惠 + 剩余券乐观优惠上界 仍追不平已得最优 → 该分支不可能
+    更优，直接剪掉（`optimistic >= best_total - eps`）。
+    """
+    original = total_price(items, delivery_fee)
+    n = len(coupons)
+    ideals = [_coupon_ideal_discount(c, items, delivery_fee) for c in coupons]
+    # 按乐观优惠降序：好解更早出现 → 上界更紧 → 剪枝更狠
+    order = sorted(range(n), key=lambda i: ideals[i], reverse=True)
+    # suffix[k] = 排序后第 k..n-1 张券的乐观优惠之和（上界）
+    suffix = [0.0] * (n + 1)
+    for k in range(n - 1, -1, -1):
+        suffix[k] = suffix[k + 1] + ideals[order[k]]
+
+    best_total = original
+    best_subset: List[Coupon] = []
+    stats = {"nodes": 0, "pruned": 0}
+    eps = 1e-9
+
+    def dfs(idx: int, discount: float, chosen: List[Coupon],
+            used_groups: frozenset, ol_count: int, fd_used: bool) -> None:
+        nonlocal best_total, best_subset
+        stats["nodes"] += 1
+        # 乐观下界：剩余券全部入选也追不平当前最优 → 剪枝
+        optimistic = max(0.0, original - (discount + suffix[idx]))
+        if optimistic >= best_total - eps:
+            stats["pruned"] += 1
+            return
+        if idx == n:
+            # 走到叶子且通过剪枝检查，说明严格优于当前最优
+            best_total = max(0.0, original - discount)
+            best_subset = list(chosen)
+            return
+        c = coupons[order[idx]]
+        # 分支 1：不选该券
+        dfs(idx + 1, discount, chosen, used_groups, ol_count, fd_used)
+        # 分支 2：选该券（若约束允许）
+        if _can_take(c, items, used_groups, ol_count):
+            grp = _effective_group(c)
+            next_groups = used_groups | {grp} if grp is not None else used_groups
+            next_ol = ol_count + (1 if _is_order_level(c) else 0)
+            add = _take_discount(c, items, delivery_fee)
+            next_fd = fd_used
+            if c.kind == "free_delivery":
+                # 与暴力枚举同语义：免配送费最多减免一次（避免重复减配送费）
+                if fd_used:
+                    add = 0.0
+                next_fd = True
+            chosen.append(c)
+            dfs(idx + 1, discount + add, chosen, next_groups, next_ol, next_fd)
+            chosen.pop()
+
+    dfs(0, 0.0, [], frozenset(), 0, False)
+    return best_total, best_subset, stats
+
+
 def optimize_coupons(
     items: List[Item],
     coupons: List[Coupon],
     delivery_fee: float = 0.0,
+    *,
+    strategy: str = "auto",
+    brute_force_limit: int = 16,
 ) -> dict:
-    """枚举所有券组合，返回最低总价方案。
+    """求最低总价方案（支持暴力枚举 / 分支限界两种策略）。
+
+    strategy:
+      - "auto"（默认）：券数 <= `brute_force_limit` 走暴力枚举；超过则先做
+        0 优惠券剪枝，再走分支限界（与暴力枚举同解但可扩展到大券池）。
+      - "bruteforce"：强制暴力枚举 2^n（作为正确性基准）。
+      - "bnb"：强制分支限界。
 
     返回结构：
     {
@@ -172,45 +302,48 @@ def optimize_coupons(
     }
     """
     original_total = total_price(items, delivery_fee)
-    best_total = original_total
-    best_subset: List[Coupon] = []
-
     n = len(coupons)
-    # 暴力枚举 2^n 个子集（候选券通常为个位数，性能充足）
-    for r in range(0, n + 1):
-        for subset in combinations(coupons, r):
-            subset_list = list(subset)
-            if not _is_valid_subset(subset_list, items, delivery_fee):
-                continue
-            discount = 0.0
-            has_free_delivery = False
-            for c in subset_list:
-                if c.kind == "free_delivery":
-                    has_free_delivery = True
+    use_bnb = strategy == "bnb" or (strategy == "auto" and n > brute_force_limit)
+
+    if use_bnb:
+        pruned = _prune_zero_value(coupons, items, delivery_fee)
+        best_total, best_subset, _stats = _optimal_subset_bnb(items, pruned, delivery_fee)
+    else:
+        best_total = original_total
+        best_subset: List[Coupon] = []
+        # 暴力枚举 2^n 个子集（候选券通常为个位数，性能充足）
+        for r in range(0, n + 1):
+            for subset in combinations(coupons, r):
+                subset_list = list(subset)
+                if not _is_valid_subset(subset_list, items, delivery_fee):
                     continue
-                discount += _coupon_discount(c, items)
-            if has_free_delivery:
-                discount += delivery_fee
-            # 优惠不得超过应付总额
-            payable = max(0.0, original_total - discount)
-            if payable < best_total - 1e-9:
-                best_total = payable
-                best_subset = subset_list
+                discount = 0.0
+                has_free_delivery = False
+                for c in subset_list:
+                    if c.kind == "free_delivery":
+                        has_free_delivery = True
+                        continue
+                    discount += _coupon_discount(c, items)
+                if has_free_delivery:
+                    discount += delivery_fee
+                # 优惠不得超过应付总额
+                payable = max(0.0, original_total - discount)
+                if payable < best_total - 1e-9:
+                    best_total = payable
+                    best_subset = subset_list
 
     # 构造明细（按输入顺序输出 id）
-    coupon_order = {c.id: c for c in coupons}
+    ordered_subset = [c for c in coupons if c in best_subset]
     breakdown = []
-    saved = round(original_total - best_total, 2)
-    for cid in [c.id for c in coupons if c in best_subset]:
-        c = coupon_order[cid]
+    for c in ordered_subset:
         amt = delivery_fee if c.kind == "free_delivery" else _coupon_discount(c, items)
-        breakdown.append({"id": cid, "kind": c.kind, "discount": round(amt, 2)})
+        breakdown.append({"id": c.id, "kind": c.kind, "discount": round(amt, 2)})
 
     return {
         "original_total": round(original_total, 2),
         "best_total": round(best_total, 2),
-        "best_coupons": [c.id for c in best_subset],
-        "saved": saved,
+        "best_coupons": [c.id for c in ordered_subset],
+        "saved": round(original_total - best_total, 2),
         "breakdown": breakdown,
     }
 
