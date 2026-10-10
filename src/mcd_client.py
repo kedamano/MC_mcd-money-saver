@@ -19,6 +19,19 @@ import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Optional, Tuple
 
+try:  # 兼容「从项目根导入(src.xxx)」与「包内直接导入」两种方式
+    from src.errors import (  # noqa: F401
+        CouponRejectedError,
+        MCPBusinessError,
+        raise_if_business_error,
+    )
+except ImportError:  # pragma: no cover
+    from errors import (  # type: ignore
+        CouponRejectedError,
+        MCPBusinessError,
+        raise_if_business_error,
+    )
+
 
 class MCPTransientError(RuntimeError):
     """MCP 瞬时错误（网络抖动 / 5xx / 偶发 404 / 429 限流），可重试。"""
@@ -230,7 +243,11 @@ class McDonaldMCPClient:
         }
         if be_code:
             arguments["beCode"] = be_code
-        return self.call_tool("calculate-price", arguments)
+        data = self.call_tool("calculate-price", arguments)
+        # 真实 observe：券被拒时返回 {"success":false,"code":600012,...} 且**无 price 字段**。
+        # 若不在此拦截，调用方取值会退化为 ¥0，导致「被官方拒绝的方案反而最便宜」。
+        raise_if_business_error(data)
+        return data
 
     # ----- 外送场景（麦乐送）链路封装 -----
     def query_delivery_addresses(self) -> Any:
