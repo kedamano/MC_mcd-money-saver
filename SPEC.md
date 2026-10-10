@@ -23,6 +23,10 @@
 | FR-5 | 最优组合 | 枚举所有券组合，在约束下求最低到手价；返回 `original_total / best_total / best_coupons / saved / breakdown` |
 | FR-6 | 官方核价 | 用 FR-5 结果调用 `calculate-price`（支持在 `items[].couponCode`+`couponId` 传券），**以服务器返回值作为权威金额** |
 | FR-7 | 确认下单 | 向用户展示省钱方案，确认后 `create-order` 获取支付链接，`query-order` 核对 |
+| FR-8 | 产品级绑定 | 券 `product_codes` 非空时仅作用于绑定商品（`_eligible_items`），避免错配类目 |
+| FR-9 | 凑单建议 | 对未达门槛的满减券，从目录反推最小代价加购组合，`net_saving<=0` 不推荐 |
+| FR-10 | 时效与库存 | 按 `expires_at` 剔除过期券（`filter_valid_coupons`）；`Item.available=False` 提示并移出优惠范围 |
+| FR-11 | 两阶段核价 | 本地枚举 Top-K 候选，仅对 K 个调官方 `calculate-price` 取权威价（`two_stage_optimize`），规避 2^n 次调用 |
 
 ## 3. 真实业务规则（来自联调观测，具约束力）
 
@@ -44,20 +48,28 @@
 
 | 层级 | 文件 | 说明 |
 |---|---|---|
-| 单元测试 | `tests/test_coupon_optimizer.py` | 优化器 10 例：满减门槛、折扣封顶、互斥、组合择优、类目限制等 |
-| 适配单测 | `tests/test_mcd_client.py`（离线部分） | 协议解析、请求体构造、业务 JSON 抽取 |
+| 单元测试 | `tests/test_coupon_optimizer.py` | 优化器：满减门槛、折扣封顶、互斥、组合择优、类目限制等 |
+| 增强单测 | `tests/test_enhancements.py` | B/C/D/E 契约：产品级绑定、凑单、两阶段、时效库存 |
+| 适配单测 | `tests/test_mcd_client.py`（离线部分） | 协议解析、请求体构造、业务 JSON 抽取（含 data 拆层） |
 | 合同测试 | `tests/test_real_contract.py` | 基于真实 `calculate-price` 返回，断言客户端模型与服务器一致 |
 | 真实冒烟 | `tests/test_mcd_client.py::test_live_end_to_end`（`-m live`） | 真实连接完成 `initialize→list_tools→call_tool`，默认跳过 |
 
 运行：
 ```bash
-python -m pytest tests/ -q                 # 离线：19 例全过
+python -m pytest tests/ -q                 # 离线：33 例全过
 MCD_MCP_TOKEN=xxx pytest -m live -q        # 真实端到端（可选）
+python examples/demo_smart.py              # B/C/D/E 离线演示
+MCD_MCP_TOKEN=xxx python examples/demo_smart.py --live   # D 真实官方核价演示
 ```
 
-## 6. 已知限制与后续优化（待办）
+## 6. 优化项交付状态（SDD+TDD 落地）
 
-- **B. 产品级绑定建模**：当前 `Coupon.applies_to` 为泛类目；应升级为按 `product_codes` 精确匹配，避免把产品券误用到其他商品。
-- **C. 凑单建议**：当距满减门槛差 X 元时，建议加购最小代价商品以跨门槛（高价值真实功能，当前缺失）。
-- **D. 两阶段校验**：候选组合先本地剪枝，再仅对 Top-K 调 `calculate-price` 取权威值（避免 2^n 次网络调用）。
-- **E. 时效与库存**：用 `now-time-info` 校验券有效期；对不可售商品（如裸算价为 0 的券绑定品）给出提示。
+| 项 | 能力 | 实现位置 | 状态 |
+|---|---|---|---|
+| **B** | 产品级绑定：券按 `product_codes` 精确匹配，误配即失效；适配器正式字段化 | `coupon_optimizer.Coupon.product_codes` / `_eligible_items` / `coupon_adapter.adapt_coupon` | ✅ |
+| **C** | 凑单建议：对未达门槛满减券，从真实目录反推最小代价加购组合，净收益为负则不推 | `coupon_smart.suggest_threshold_addons` / `CatalogItem` / `load_catalog` | ✅ |
+| **D** | 两阶段校验：本地枚举 Top-K → 仅对 K 个候选调官方 `calculate-price` 取权威价；客户端提供真实 `price_combo` / `price_combo_as_fn` | `coupon_optimizer.rank_candidates` / `coupon_smart.two_stage_optimize` / `mcd_client.price_combo` | ✅ |
+| **E** | 时效与库存：按 `expires_at` 剔除过期券；`available=False` 商品提示并移出优惠范围 | `coupon_optimizer.filter_valid_coupons` / `check_item_availability` / `Item.available` | ✅ |
+
+> 关键 Bug 修复（联调发现）：`calculate-price` 返回结构为 `{success,code,message,data:{...}}`，
+> `extract_business_data` 已修正为拆到最内层 `data`，否则会取到 `price=None` 导致核价归零。
