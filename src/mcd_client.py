@@ -194,13 +194,18 @@ class McDonaldMCPClient:
         order_type: int = 1,
         be_type: int = 1,
         need_tableware: bool = False,
+        be_code: Optional[str] = None,
     ) -> Dict[str, Any]:
         """调用 calculate-price 获取官方权威金额（单位：分）。
 
         参数：
             items:   [{"product_code": "520689", "quantity": 1}, ...]
             coupons: [{"coupon_code": "MCD...", "coupon_id": "365A..."}, ...]（可选）
-        返回业务 data：含 originalPrice / discount / price / packingPrice 等（分）。
+            be_code: 外送场景必传（beType=2/5/6）。真实 observe：外送不传 beCode
+                     返回 code=600048「外送场景下，beType=2/5/6时必传beCode」；
+                     beCode 来自 `delivery-query-stores` 返回的外送门店。
+        返回业务 data：含 originalPrice / discount / price / packingPrice /
+                     deliveryPrice（配送费，分）等。
         """
         priced_items = []
         for it in items:
@@ -223,7 +228,51 @@ class McDonaldMCPClient:
             "needTableware": need_tableware,
             "items": priced_items,
         }
+        if be_code:
+            arguments["beCode"] = be_code
         return self.call_tool("calculate-price", arguments)
+
+    # ----- 外送场景（麦乐送）链路封装 -----
+    def query_delivery_addresses(self) -> Any:
+        """查询用户配送地址列表（delivery-query-addresses）。
+
+        返回 {"addresses": [...]}；地址簿为空时返回 {"addresses": []}。
+        """
+        return self.call_tool("delivery-query-addresses", {})
+
+    def create_delivery_address(
+        self,
+        city: str,
+        address: str,
+        address_detail: str,
+        contact_name: str,
+        phone: str,
+        gender: Optional[str] = None,
+    ) -> Any:
+        """创建配送地址（delivery-create-address）。
+
+        ⚠️ 有副作用：会真实写入用户 McDonald's 账户地址簿。调用前须经用户确认。
+        phone 必须为 11 位纯数字。返回新地址（含 addressId，供 delivery-query-stores 使用）。
+        """
+        args: Dict[str, Any] = {
+            "city": city,
+            "address": address,
+            "addressDetail": address_detail,
+            "contactName": contact_name,
+            "phone": phone,
+        }
+        if gender:
+            args["gender"] = gender
+        return self.call_tool("delivery-create-address", args, retry=False)
+
+    def query_delivery_stores(self, address_id: str, be_type: int = 2) -> Any:
+        """按地址查询可配送门店（delivery-query-stores）。
+
+        be_type：2=麦乐送，6=团餐。返回的门店含 **beCode**（外送核价/下单必传）。
+        """
+        return self.call_tool(
+            "delivery-query-stores", {"beType": be_type, "addressId": address_id}
+        )
 
     @staticmethod
     def pick_take_way(price_data: Dict[str, Any], prefer: str = "take-in-store") -> Optional[str]:
@@ -251,6 +300,7 @@ class McDonaldMCPClient:
         be_type: int = 1,
         need_tableware: bool = False,
         address_id: Optional[str] = None,
+        be_code: Optional[str] = None,
         remark: Optional[str] = None,
     ) -> Dict[str, Any]:
         """调用 create-order 创建订单（⚠️ 真实下单，会生成待支付订单）。
@@ -291,6 +341,8 @@ class McDonaldMCPClient:
         else:
             if address_id:
                 arguments["addressId"] = address_id
+            if be_code:
+                arguments["beCode"] = be_code
             if remark:
                 arguments["remark"] = remark
         # 下单为非幂等操作，禁用重试，杜绝重复下单
